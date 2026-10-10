@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+<title>Управление администраторами</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: #1a1a2e; color: #eee; min-height: 100vh;
+  }
+  body { padding: 20px; }
+  h1 { text-align: center; color: #4fc3f7; margin: 0 0 25px; font-size: 26px; }
+  .container { max-width: 1200px; margin: 0 auto; }
+
+  .form-box {
+    background: #16213e; padding: 20px; border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4); margin-bottom: 30px;
+  }
+  .form-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 15px; margin-bottom: 15px;
+  }
+  label { display: block; font-size: 13px; color: #9fb3c8; margin-bottom: 5px; }
+  input[type="text"], input[type="url"], input[type="date"] {
+    width: 100%; padding: 12px; border-radius: 8px;
+    border: 1px solid #2c3e60; background: #0f3460; color: #fff;
+    font-size: 16px; outline: none; font-family: inherit;
+  }
+  input:focus { border-color: #4fc3f7; }
+
+  .custom-select { position: relative; user-select: none; width: 100%; }
+  .custom-select-trigger {
+    padding: 12px; border-radius: 8px; border: 1px solid #2c3e60;
+    background: #0f3460; color: #fff; font-size: 16px; cursor: pointer;
+    display: flex; justify-content: space-between; align-items: center;
+    gap: 10px; transition: 0.2s; word-break: break-word;
+  }
+  .custom-select-trigger:hover { border-color: #4fc3f7; }
+  .custom-select.open .custom-select-trigger { border-color: #4fc3f7; }
+  .custom-select-trigger .arrow { transition: 0.25s; color: #4fc3f7; font-size: 12px; flex-shrink: 0; }
+  .custom-select.open .custom-select-trigger .arrow { transform: rotate(180deg); }
+  .custom-select-options {
+    position: absolute; top: calc(100% + 6px); left: 0; right: 0;
+    background: #0f3460; border: 1px solid #4fc3f7; border-radius: 10px;
+    max-height: 280px; overflow-y: auto; z-index: 50;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+    opacity: 0; transform: translateY(-8px); pointer-events: none; transition: 0.2s;
+  }
+  .custom-select.open .custom-select-options { opacity: 1; transform: translateY(0); pointer-events: auto; }
+  .custom-select-options::-webkit-scrollbar { width: 8px; }
+  .custom-select-options::-webkit-scrollbar-track { background: #0a2540; border-radius: 10px; }
+  .custom-select-options::-webkit-scrollbar-thumb { background: #4fc3f7; border-radius: 10px; }
+  .custom-select-option {
+    padding: 11px 14px; font-size: 14.5px; color: #cdd9e5; cursor: pointer;
+    border-bottom: 1px solid #1a2c4a; transition: 0.15s;
+  }
+  .custom-select-option:last-child { border-bottom: none; }
+  .custom-select-option:hover { background: #4fc3f7; color: #001f3f; }
+  .custom-select-option.selected { background: #2c3e60; color: #4fc3f7; font-weight: bold; }
+  .custom-select-option.selected:hover { background: #4fc3f7; color: #001f3f; }
+
+  .add-btn {
+    width: 100%; padding: 14px 22px; border: none; border-radius: 8px;
+    background: #4fc3f7; color: #001f3f; font-weight: bold; cursor: pointer;
+    font-size: 16px; transition: 0.2s; font-family: inherit;
+  }
+  .add-btn:hover { background: #29b6f6; }
+  .add-btn:active { transform: scale(0.98); }
+
+  .search-box { margin-bottom: 20px; position: relative; }
+  .search-box input { padding-left: 44px; }
+  .search-box::before {
+    content: "🔍"; position: absolute; left: 14px; top: 50%;
+    transform: translateY(-50%); font-size: 16px; pointer-events: none; opacity: 0.7;
+  }
+
+  .cards {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px;
+  }
+  .card {
+    background: #16213e; border-radius: 12px; padding: 18px;
+    border-left: 6px solid #4fc3f7; box-shadow: 0 4px 15px rgba(0,0,0,0.3); transition: 0.3s;
+  }
+  .card.warned { border-left-color: #e94560; background: #2a1622; }
+  .card.warned .nick { color: #ff6b81; }
+  .card.warned::after {
+    content: "⚠ 3/3 ВЫГОВОРОВ"; display: block; margin-top: 10px;
+    text-align: center; background: #e94560; color: #fff;
+    padding: 6px; border-radius: 6px; font-weight: bold; font-size: 12px; letter-spacing: 1px;
+  }
+  .nick {
+    font-size: 20px; font-weight: bold; color: #4fc3f7; margin-bottom: 8px;
+    display: flex; align-items: center; gap: 8px; word-break: break-word;
+  }
+  .nick a { color: inherit; text-decoration: none; font-size: 15px; opacity: 0.7; }
+  .nick a:hover { opacity: 1; text-decoration: underline; }
+
+  .info-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 7px 0; font-size: 14px; border-bottom: 1px dashed #2c3e60; gap: 10px;
+  }
+  .info-row:last-of-type { border-bottom: none; }
+  .info-row > span:first-child { color: #9fb3c8; }
+
+  .counter-controls { display: flex; align-items: center; gap: 8px; }
+  .counter-btn {
+    width: 34px; height: 34px; border-radius: 8px; background: #0f3460;
+    color: #4fc3f7; border: 1px solid #4fc3f7; font-weight: bold; cursor: pointer;
+    padding: 0; font-size: 18px; line-height: 1; font-family: inherit; transition: 0.15s;
+  }
+  .counter-btn:hover:not(:disabled) { background: #4fc3f7; color: #001f3f; }
+  .counter-btn:active:not(:disabled) { transform: scale(0.9); }
+  .counter-btn:disabled { opacity: 0.35; cursor: not-allowed; border-color: #2c3e60; color: #667; }
+  .counter-val { min-width: 36px; text-align: center; font-weight: bold; }
+
+  .card-actions { display: flex; gap: 8px; margin-top: 12px; }
+  .card-actions button {
+    flex: 1; padding: 10px; font-size: 14px; border: none;
+    border-radius: 8px; font-weight: bold; cursor: pointer;
+    font-family: inherit; transition: 0.2s;
+  }
+  .edit-btn { background: #2c3e60; color: #4fc3f7; border: 1px solid #4fc3f7 !important; }
+  .edit-btn:hover { background: #4fc3f7; color: #001f3f; }
+  .remove-btn { background: #e94560; color: #fff; }
+  .remove-btn:hover { background: #c73650; }
+
+  .empty { text-align: center; color: #667; padding: 40px 20px; font-size: 16px; }
+
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.65);
+    backdrop-filter: blur(4px); display: flex; align-items: center;
+    justify-content: center; padding: 20px; z-index: 1000;
+    opacity: 0; pointer-events: none; transition: 0.2s; overflow-y: auto;
+  }
+  .modal-overlay.show { opacity: 1; pointer-events: auto; }
+  .modal {
+    background: #16213e; border: 1px solid #4fc3f7; border-radius: 14px;
+    padding: 24px; max-width: 440px; width: 100%;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.7);
+    transform: scale(0.9); transition: 0.25s; margin: auto;
+  }
+  .modal-overlay.show .modal { transform: scale(1); }
+  .modal h3 { margin: 0 0 16px; color: #4fc3f7; font-size: 20px; display: flex; align-items: center; gap: 10px; }
+  .modal.danger h3 { color: #e94560; }
+  .modal p { margin: 0 0 22px; color: #cdd9e5; font-size: 15px; line-height: 1.5; }
+  .modal p b { color: #4fc3f7; }
+  .modal .modal-field { margin-bottom: 15px; }
+  .modal .modal-field:last-of-type { margin-bottom: 20px; }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+  .modal-btn {
+    padding: 11px 22px; border-radius: 8px; border: none; font-size: 15px;
+    font-weight: bold; cursor: pointer; font-family: inherit; transition: 0.2s;
+  }
+  .modal-btn.cancel { background: #2c3e60; color: #cdd9e5; }
+  .modal-btn.cancel:hover { background: #3a527a; }
+  .modal-btn.confirm { background: #e94560; color: #fff; }
+  .modal-btn.confirm:hover { background: #c73650; }
+  .modal-btn.save { background: #4fc3f7; color: #001f3f; }
+  .modal-btn.save:hover { background: #29b6f6; }
+  .modal-btn:active { transform: scale(0.97); }
+
+  .status {
+    position: fixed; top: 12px; right: 12px; padding: 8px 14px;
+    border-radius: 8px; font-size: 13px; z-index: 2000;
+    background: #2c3e60; color: #cdd9e5;
+    opacity: 0; transition: 0.3s; pointer-events: none;
+  }
+  .status.show { opacity: 1; }
+  .status.ok { background: #1b5e20; color: #b9f6ca; }
+  .status.err { background: #b71c1c; color: #ffcdd2; }
+
+  @media (max-width: 1024px) {
+    body { padding: 16px; }
+    h1 { font-size: 24px; margin-bottom: 20px; }
+    .form-grid { grid-template-columns: repeat(2, 1fr); }
+    .cards { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+  }
+  @media (max-width: 640px) {
+    body { padding: 12px; }
+    h1 { font-size: 20px; margin-bottom: 16px; }
+    .form-box { padding: 14px; border-radius: 10px; margin-bottom: 20px; }
+    .form-grid { grid-template-columns: 1fr; gap: 12px; margin-bottom: 14px; }
+    .cards { grid-template-columns: 1fr; gap: 14px; }
+    .card { padding: 14px; border-left-width: 5px; }
+    .nick { font-size: 18px; }
+    .info-row { font-size: 13.5px; }
+    .counter-btn { width: 40px; height: 40px; font-size: 20px; }
+    .counter-val { min-width: 40px; font-size: 16px; }
+    .card-actions button { padding: 12px; font-size: 15px; }
+    .custom-select-options { max-height: 220px; }
+    .custom-select-option { padding: 13px 14px; font-size: 15px; }
+    .modal { padding: 20px; }
+    .modal-actions { flex-direction: column; }
+    .modal-btn { width: 100%; padding: 13px; }
+  }
+  @media (max-width: 360px) {
+    body { padding: 8px; }
+    h1 { font-size: 18px; }
+    .card { padding: 12px; }
+    .info-row { font-size: 13px; }
+    .counter-btn { width: 36px; height: 36px; font-size: 18px; }
+  }
+</style>
+</head>
+<body>
+<div class="status" id="status"></div>
+
+<div class="container">
+  <h1>🛡 Управление администраторами</h1>
+
+  <div class="form-box">
+    <div class="form-grid">
+      <div>
+        <label>Ник администратора</label>
+        <input type="text" id="nick" placeholder="Например: SuperAdmin">
+      </div>
+      <div>
+        <label>Ссылка на профиль</label>
+        <input type="url" id="link" placeholder="https://...">
+      </div>
+      <div>
+        <label>Должность</label>
+        <div class="custom-select" id="positionSelect">
+          <div class="custom-select-trigger">
+            <span class="custom-select-value">Владелец</span>
+            <span class="arrow">▼</span>
+          </div>
+          <div class="custom-select-options">
+            <div class="custom-select-option selected" data-value="Владелец">Владелец</div>
+            <div class="custom-select-option" data-value="Заместитель Владельца">Заместитель Владельца</div>
+            <div class="custom-select-option" data-value="Основатель">Основатель</div>
+            <div class="custom-select-option" data-value="Главный Заместитель Основателя">Главный Заместитель Основателя</div>
+            <div class="custom-select-option" data-value="Заместитель Основателя">Заместитель Основателя</div>
+            <div class="custom-select-option" data-value="Руководитель Проектов">Руководитель Проектов</div>
+            <div class="custom-select-option" data-value="Помощник Руководителя проекта">Помощник Руководителя проекта</div>
+            <div class="custom-select-option" data-value="Команда Проекта">Команда Проекта</div>
+            <div class="custom-select-option" data-value="Спец Администратор">Спец Администратор</div>
+            <div class="custom-select-option" data-value="Заместитель Спец Администратора">Заместитель Спец Администратора</div>
+            <div class="custom-select-option" data-value="Главный Администратор">Главный Администратор</div>
+            <div class="custom-select-option" data-value="Основной Заместителя Главного Администратора">Основной Заместителя Главного Администратора</div>
+            <div class="custom-select-option" data-value="Заместитель Главного Администратора">Заместитель Главного Администратора</div>
+            <div class="custom-select-option" data-value="Куратор Администрации">Куратор Администрации</div>
+            <div class="custom-select-option" data-value="Старший Администратор">Старший Администратор</div>
+            <div class="custom-select-option" data-value="Администратор">Администратор</div>
+            <div class="custom-select-option" data-value="Младший Администратор">Младший Администратор</div>
+            <div class="custom-select-option" data-value="Модератор">Модератор</div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <label>Дата вступления на пост</label>
+        <input type="date" id="date">
+      </div>
+    </div>
+    <button class="add-btn" onclick="addAdmin()">➕ Добавить администратора</button>
+  </div>
+
+  <div class="search-box">
+    <input type="text" id="searchInput" placeholder="Поиск по должности..." oninput="render()">
+  </div>
+
+  <div class="cards" id="cards"></div>
+  <div class="empty" id="empty">Загрузка данных...</div>
+  <div class="empty" id="noResults" style="display:none;">🔍 Ничего не найдено по запросу</div>
+</div>
+
+<!-- Модалка удаления -->
+<div class="modal-overlay" id="confirmModal">
+  <div class="modal danger">
+    <h3>🗑 Удалить администратора?</h3>
+    <p>Вы действительно хотите удалить <b id="modalNick"></b>?<br>Это действие нельзя отменить.</p>
+    <div class="modal-actions">
+      <button class="modal-btn cancel" onclick="closeConfirm()">Отмена</button>
+      <button class="modal-btn confirm" onclick="confirmDelete()">Удалить</button>
+    </div>
+  </div>
+</div>
+
+<!-- Модалка редактирования -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal">
+    <h3>✏ Редактировать администратора</h3>
+    <div class="modal-field">
+      <label>Ник</label>
+      <input type="text" id="editNick" placeholder="Ник">
+    </div>
+    <div class="modal-field">
+      <label>Должность</label>
+      <div class="custom-select" id="editPositionSelect">
+        <div class="custom-select-trigger">
+          <span class="custom-select-value">Владелец</span>
+          <span class="arrow">▼</span>
+        </div>
+        <div class="custom-select-options">
+          <div class="custom-select-option" data-value="Владелец">Владелец</div>
+          <div class="custom-select-option" data-value="Заместитель Владельца">Заместитель Владельца</div>
+          <div class="custom-select-option" data-value="Основатель">Основатель</div>
+          <div class="custom-select-option" data-value="Главный Заместитель Основателя">Главный Заместитель Основателя</div>
+          <div class="custom-select-option" data-value="Заместитель Основателя">Заместитель Основателя</div>
+          <div class="custom-select-option" data-value="Руководитель Проектов">Руководитель Проектов</div>
+          <div class="custom-select-option" data-value="Помощник Руководителя проекта">Помощник Руководителя проекта</div>
+          <div class="custom-select-option" data-value="Команда Проекта">Команда Проекта</div>
+          <div class="custom-select-option" data-value="Спец Администратор">Спец Администратор</div>
+          <div class="custom-select-option" data-value="Заместитель Спец Администратора">Заместитель Спец Администратора</div>
+          <div class="custom-select-option" data-value="Главный Администратор">Главный Администратор</div>
+          <div class="custom-select-option" data-value="Основной Заместителя Главного Администратора">Основной Заместителя Главного Администратора</div>
+          <div class="custom-select-option" data-value="Заместитель Главного Администратора">Заместитель Главного Администратора</div>
+          <div class="custom-select-option" data-value="Куратор Администрации">Куратор Администрации</div>
+          <div class="custom-select-option" data-value="Старший Администратор">Старший Администратор</div>
+          <div class="custom-select-option" data-value="Администратор">Администратор</div>
+          <div class="custom-select-option" data-value="Младший Администратор">Младший Администратор</div>
+          <div class="custom-select-option" data-value="Модератор">Модератор</div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="modal-btn cancel" onclick="closeEdit()">Отмена</button>
+      <button class="modal-btn save" onclick="saveEdit()">💾 Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   НАСТРОЙКИ JSONBIN
+   ============================================================ */
+const JSONBIN_BIN_ID = "6aca74a6ac6210605a25ed4b";
+const JSONBIN_MASTER_KEY = "$2a$10$Lc7elPsa6XcKcjHULob4je8tInfD/THfYBbhb6ppgDKxmGJXJ1ORS";
+const JSONBIN_URL = `https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}`;
+
+let admins = [];
+let pendingDeleteId = null;
+let pendingEditId = null;
+let isSaving = false;
+
+function showStatus(text, type = '') {
+  const el = document.getElementById('status');
+  el.textContent = text;
+  el.className = 'status show ' + type;
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+/* ==== ЗАГРУЗКА ==== */
+async function loadFromCloud() {
+  try {
+    const res = await fetch(`${JSONBIN_URL}/latest`, {
+      headers: { 'X-Master-Key': JSONBIN_MASTER_KEY }
+    });
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`HTTP ${res.status}: ${errText}`);
+    }
+    const json = await res.json();
+    let data = json.record;
+    if (!Array.isArray(data) && data && typeof data === 'object') {
+      if (Array.isArray(data.admins)) data = data.admins;
+      else data = [];
+    }
+    admins = Array.isArray(data) ? data : [];
+    document.getElementById('empty').style.display = admins.length ? 'none' : 'block';
+    if (!admins.length) {
+      document.getElementById('empty').textContent = 'Пока нет администраторов. Добавьте первого!';
+    }
+    render();
+  } catch (e) {
+    console.error(e);
+    showStatus('❌ Ошибка загрузки: ' + e.message, 'err');
+    document.getElementById('empty').textContent = 'Ошибка загрузки: ' + e.message;
+  }
+}
+
+/* ==== СОХРАНЕНИЕ ==== */
+async function saveToCloud() {
+  if (isSaving) return;
+  isSaving = true;
+  try {
+    const res = await fetch(JSONBIN_URL, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Master-Key': JSONBIN_MASTER_KEY
+      },
+      body: JSON.stringify(admins)
+    });
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`HTTP ${res.status}: ${errText}`);
+    }
+    showStatus('✅ Сохранено', 'ok');
+  } catch (e) {
+    console.error(e);
+    showStatus('❌ Не сохранилось: ' + e.message, 'err');
+  } finally {
+    isSaving = false;
+  }
+}
+
+/* ==== КАСТОМНЫЙ SELECT ==== */
+function setupCustomSelect(selectEl) {
+  const trigger = selectEl.querySelector('.custom-select-trigger');
+  const valueSpan = selectEl.querySelector('.custom-select-value');
+  const options = selectEl.querySelectorAll('.custom-select-option');
+  trigger.addEventListener('click', (e) => {
+    e.stopPropagation();
+    document.querySelectorAll('.custom-select.open').forEach(s => {
+      if (s !== selectEl) s.classList.remove('open');
+    });
+    selectEl.classList.toggle('open');
+  });
+  options.forEach(opt => {
+    opt.addEventListener('click', () => {
+      options.forEach(o => o.classList.remove('selected'));
+      opt.classList.add('selected');
+      valueSpan.textContent = opt.dataset.value;
+      selectEl.classList.remove('open');
+    });
+  });
+  return { valueSpan, options };
+}
+
+const mainSelect = document.getElementById('positionSelect');
+const mainSelectRef = setupCustomSelect(mainSelect);
+const editSelect = document.getElementById('editPositionSelect');
+const editSelectRef = setupCustomSelect(editSelect);
+
+document.addEventListener('click', () => {
+  document.querySelectorAll('.custom-select.open').forEach(s => s.classList.remove('open'));
+});
+
+function setSelectValue(selectEl, value) {
+  const valueSpan = selectEl.querySelector('.custom-select-value');
+  const options = selectEl.querySelectorAll('.custom-select-option');
+  valueSpan.textContent = value;
+  options.forEach(o => o.classList.toggle('selected', o.dataset.value === value));
+}
+
+/* ==== CRUD ==== */
+async function addAdmin() {
+  const nick = document.getElementById('nick').value.trim();
+  const link = document.getElementById('link').value.trim();
+  const position = mainSelectRef.valueSpan.textContent;
+  const date = document.getElementById('date').value;
+  if (!nick) { alert('Введите ник администратора!'); return; }
+
+  admins.push({
+    id: 'a_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+    nick, link, position, date, warnings: 0, points: 0
+  });
+
+  document.getElementById('nick').value = '';
+  document.getElementById('link').value = '';
+  document.getElementById('date').value = '';
+  setSelectValue(mainSelect, 'Владелец');
+
+  render();
+  await saveToCloud();
+}
+
+async function changeValue(id, field, delta) {
+  const a = admins.find(x => x.id === id);
+  if (!a) return;
+  if (field === 'warnings' && delta > 0 && a.warnings >= 3) return;
+  a[field] = Math.max(0, a[field] + delta);
+  render();
+  await saveToCloud();
+}
+
+function editAdmin(id) {
+  const a = admins.find(x => x.id === id);
+  if (!a) return;
+  pendingEditId = id;
+  document.getElementById('editNick').value = a.nick;
+  setSelectValue(editSelect, a.position);
+  document.getElementById('editModal').classList.add('show');
+}
+
+function closeEdit() {
+  document.getElementById('editModal').classList.remove('show');
+  pendingEditId = null;
+}
+
+async function saveEdit() {
+  if (!pendingEditId) return;
+  const a = admins.find(x => x.id === pendingEditId);
+  if (!a) return;
+  const newNick = document.getElementById('editNick').value.trim();
+  if (!newNick) { alert('Ник не может быть пустым!'); return; }
+
+  a.nick = newNick;
+  a.position = editSelectRef.valueSpan.textContent;
+
+  closeEdit();
+  render();
+  await saveToCloud();
+}
+
+function removeAdmin(id) {
+  const a = admins.find(x => x.id === id);
+  if (!a) return;
+  pendingDeleteId = id;
+  document.getElementById('modalNick').textContent = a.nick;
+  document.getElementById('confirmModal').classList.add('show');
+}
+
+function closeConfirm() {
+  document.getElementById('confirmModal').classList.remove('show');
+  pendingDeleteId = null;
+}
+
+async function confirmDelete() {
+  if (!pendingDeleteId) return;
+  admins = admins.filter(x => x.id !== pendingDeleteId);
+  pendingDeleteId = null;
+  document.getElementById('confirmModal').classList.remove('show');
+  render();
+  await saveToCloud();
+}
+
+document.getElementById('confirmModal').addEventListener('click', (e) => {
+  if (e.target.id === 'confirmModal') closeConfirm();
+});
+document.getElementById('editModal').addEventListener('click', (e) => {
+  if (e.target.id === 'editModal') closeEdit();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') { closeConfirm(); closeEdit(); }
+});
+
+/* ==== РЕНДЕР ==== */
+function formatDate(d) {
+  if (!d) return '—';
+  const [y, m, day] = d.split('-');
+  return `${day}.${m}.${y}`;
+}
+
+function render() {
+  const container = document.getElementById('cards');
+  const noResults = document.getElementById('noResults');
+  const query = (document.getElementById('searchInput').value || '').trim().toLowerCase();
+  const filtered = query === ''
+    ? admins
+    : admins.filter(a => a.position.toLowerCase().includes(query));
+
+  if (admins.length === 0) {
+    container.innerHTML = '';
+    document.getElementById('empty').style.display = 'block';
+    noResults.style.display = 'none';
+    return;
+  }
+  document.getElementById('empty').style.display = 'none';
+
+  if (filtered.length === 0) {
+    container.innerHTML = '';
+    noResults.style.display = 'block';
+    return;
+  }
+  noResults.style.display = 'none';
+
+  container.innerHTML = filtered.map(a => {
+    const isWarned = a.warnings >= 3;
+    const warnBtnDisabled = a.warnings >= 3;
+    return `
+      <div class="card ${isWarned ? 'warned' : ''}">
+        <div class="nick">
+          ${escapeHtml(a.nick)}
+          ${a.link ? `<a href="${escapeAttr(a.link)}" target="_blank" rel="noopener">🔗</a>` : ''}
+        </div>
+        <div class="info-row">
+          <span>Должность</span>
+          <span>${escapeHtml(a.position)}</span>
+        </div>
+        <div class="info-row">
+          <span>На посту с</span>
+          <span>${formatDate(a.date)}</span>
+        </div>
+        <div class="info-row">
+          <span>Выговоры</span>
+          <span class="counter-controls">
+            <button class="counter-btn" onclick="changeValue('${a.id}','warnings',-1)" ${a.warnings <= 0 ? 'disabled' : ''}>−</button>
+            <span class="counter-val" style="${isWarned ? 'color:#ff6b81' : ''}">${a.warnings}/3</span>
+            <button class="counter-btn" onclick="changeValue('${a.id}','warnings',1)" ${warnBtnDisabled ? 'disabled' : ''}>+</button>
+          </span>
+        </div>
+        <div class="info-row">
+          <span>Баллы</span>
+          <span class="counter-controls">
+            <button class="counter-btn" onclick="changeValue('${a.id}','points',-1)" ${a.points <= 0 ? 'disabled' : ''}>−</button>
+            <span class="counter-val">${a.points}</span>
+            <button class="counter-btn" onclick="changeValue('${a.id}','points',1)">+</button>
+          </span>
+        </div>
+        <div class="card-actions">
+          <button class="edit-btn" onclick="editAdmin('${a.id}')">✏ Изменить</button>
+          <button class="remove-btn" onclick="removeAdmin('${a.id}')">🗑 Удалить</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+}
+function escapeAttr(s) { return String(s).replace(/"/g, '&quot;'); }
+
+loadFromCloud();
+</script>
+</body>
+</html>
