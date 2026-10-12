@@ -838,16 +838,24 @@ function canEditTargetMessage(t) {
   if (!canEditUsers()) return `Редактировать может только ${EDIT_MIN_POSITION} и выше`;
   if (getRank(currentUser.position) <= getRank(t.position)) return 'Нельзя редактировать тех, кто равен или выше вас';
   return '';
-}
 function canMarkActivity(t) {
   if (!currentUser) return false;
+  // Владелец может отмечать всем
+  if (currentUser.isOwner) return true;
+  // Обычный админ — только себе
   return currentUser.nick.toLowerCase() === (t.nick || '').toLowerCase();
-}
-function canMarkActivityMessage(t) {
+ }
+
+ function canMarkActivityMessage(t) {
   if (!currentUser) return 'Не выполнен вход';
-  if (currentUser.nick.toLowerCase() !== (t.nick || '').toLowerCase()) return 'Можно отмечать активность только себе';
+  // Владелец может всем — не показываем ошибку
+  if (currentUser.isOwner) return '';
+  // Обычный админ — только себе
+  if (currentUser.nick.toLowerCase() !== (t.nick || '').toLowerCase()) {
+    return 'Отмечать активность другим может только Владелец';
+  }
   return '';
-}
+   }
 
 /* ============================================================
    ГЕНЕРАЦИЯ КЛЮЧА
@@ -1313,9 +1321,10 @@ async function confirmActivity() {
   if (err) { showStatus('❌ ' + err, 'err'); closeActivity(); return; }
   if (hasMarkedToday(a)) { showStatus('⚠ Вы уже отметились сегодня', ''); closeActivity(); return; }
 
-  const comment = document.getElementById('activityComment').value.trim();
+    const comment = document.getElementById('activityComment').value.trim();
   const newActivity = new Date().toISOString();
-  const newHistory = [{ at: newActivity, by: currentUser.nick, comment }, ...(a.activity_history || [])].slice(0, 50);
+  const isSelf = currentUser.nick.toLowerCase() === a.nick.toLowerCase();
+  const newHistory = [{ at: newActivity, by: currentUser.nick, comment, forWhom: a.nick }, ...(a.activity_history || [])].slice(0, 50);
 
   try {
     const { error } = await supabaseClient.from('admins').update({
@@ -1325,7 +1334,13 @@ async function confirmActivity() {
     if (error) throw error;
     a.last_activity = newActivity;
     a.activity_history = newHistory;
-    await addLog('activity', `<b>${escapeHtml(currentUser.nick)}</b> отметил(а) свою активность${comment ? ', ' + escapeHtml(comment) : ''}`);
+
+    if (isSelf) {
+      await addLog('activity', `<b>${escapeHtml(currentUser.nick)}</b> отметил(а) свою активность${comment ? ', ' + escapeHtml(comment) : ''}`);
+    } else {
+      await addLog('activity', `<b>${escapeHtml(currentUser.nick)}</b> отметил(а) активность <b>${escapeHtml(a.nick)}</b>${comment ? ', ' + escapeHtml(comment) : ''}`);
+    }
+
     closeActivity();
     renderAll();
     showStatus('✅ Активность отмечена', 'ok');
@@ -2164,10 +2179,16 @@ function renderAdmins() {
     if (inactive) cardClass += ' inactive';
     if (me) cardClass += ' my-card';
 
-    let activityBtn = '';
+        let activityBtn = '';
     if (canMark) {
-      if (alreadyMarked) activityBtn = `<button class="active-btn" disabled style="opacity:0.5;cursor:default;">✓ Уже отмечено сегодня</button>`;
-      else activityBtn = `<button class="active-btn" onclick="openActivity('${a.id}')">✅ Отметить активность</button>`;
+      const isSelf = me;
+      if (alreadyMarked) {
+        activityBtn = `<button class="active-btn" disabled style="opacity:0.5;cursor:default;">✓ Уже отмечено сегодня</button>`;
+      } else {
+        activityBtn = isSelf
+          ? `<button class="active-btn" onclick="openActivity('${a.id}')">✅ Отметить свою активность</button>`
+          : `<button class="active-btn" onclick="openActivity('${a.id}')">✅ Отметить активность для ${escapeHtml(a.nick)}</button>`;
+      }
     }
 
     return `
