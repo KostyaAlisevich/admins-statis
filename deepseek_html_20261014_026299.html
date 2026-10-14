@@ -1,0 +1,2745 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+<title>Управление администрацией</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; background: #1a1a2e; color: #eee; min-height: 100vh; }
+  body { padding: 20px; }
+  h1 { text-align: center; color: #4fc3f7; margin: 0 0 20px; font-size: 26px; }
+  .container { max-width: 1200px; margin: 0 auto; }
+  .auth-bar { display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+  .auth-status { font-size: 13px; color: #9fb3c8; padding: 8px 14px; background: #16213e; border-radius: 8px; border: 1px solid #2c3e60; }
+  .auth-status.logged { color: #b9f6ca; border-color: #1b5e20; }
+  .auth-status.owner { color: #ffd54f; border-color: #4a3a0d; }
+  .auth-btn { padding: 9px 18px; border: none; border-radius: 8px; font-size: 13.5px; font-weight: bold; font-family: inherit; cursor: pointer; transition: 0.2s; position: relative; }
+  .auth-btn.login { background: #4fc3f7; color: #001f3f; }
+  .auth-btn.login:hover { background: #29b6f6; }
+  .auth-btn.logout { background: #2c3e60; color: #cdd9e5; }
+  .auth-btn.logout:hover { background: #3a527a; }
+  .auth-btn.refresh { background: #66bb6a; color: #003300; }
+  .auth-btn.refresh:hover { background: #4caf50; }
+  .auth-btn.bell { background: #2c3e60; color: #ffd54f; padding: 9px 14px; font-size: 16px; }
+  .auth-btn.bell:hover { background: #3a527a; }
+  .bell-count {
+    position: absolute; top: -6px; right: -6px;
+    background: #e94560; color: #fff;
+    font-size: 11px; font-weight: bold;
+    padding: 2px 6px; border-radius: 10px;
+    min-width: 18px; text-align: center;
+    line-height: 1.3;
+  }
+  .connection-status { position: fixed; top: 12px; left: 12px; padding: 8px 14px; border-radius: 8px; font-size: 12.5px; z-index: 2500; background: #2c3e60; color: #cdd9e5; display: flex; align-items: center; gap: 8px; transition: 0.3s; box-shadow: 0 4px 15px rgba(0,0,0,0.4); }
+  .connection-status .dot { width: 8px; height: 8px; border-radius: 50%; background: #ffb300; animation: pulse 1.2s infinite; }
+  .connection-status.ok .dot { background: #66bb6a; animation: none; }
+  .connection-status.err .dot { background: #e94560; animation: none; }
+  @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(1.3); } }
+
+  .tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 24px;
+    background: #16213e;
+    padding: 6px;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: #4fc3f7 #0a2540;
+  }
+  .tabs::-webkit-scrollbar { height: 6px; }
+  .tabs::-webkit-scrollbar-track { background: #0a2540; border-radius: 3px; }
+  .tabs::-webkit-scrollbar-thumb { background: #4fc3f7; border-radius: 3px; }
+
+  .tab {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 16px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: #9fb3c8;
+    font-size: 14.5px;
+    font-weight: bold;
+    font-family: inherit;
+    cursor: pointer;
+    transition: 0.2s;
+    white-space: nowrap;
+    min-width: auto;
+    line-height: 1;
+  }
+  .tab:hover { color: #4fc3f7; }
+  .tab.active { background: #4fc3f7; color: #001f3f; }
+  .tab .badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 22px;
+    height: 20px;
+    padding: 0 7px;
+    background: #2c3e60;
+    color: #cdd9e5;
+    font-size: 11px;
+    border-radius: 10px;
+    font-weight: bold;
+    line-height: 1;
+    flex-shrink: 0;
+    box-sizing: border-box;
+  }
+  .tab.active .badge { background: #001f3f; color: #4fc3f7; }
+  .tab .badge.red { background: #e94560; color: #fff; }
+  .tab.active .badge.red { background: #fff; color: #e94560; }
+  .tab .badge.gold { background: #ffb300; color: #001f3f; }
+  .tab .badge.blue { background: #42a5f5; color: #fff; }
+  .tab .badge.pulse { background: #e94560; color: #fff; animation: bellPulse 1.5s infinite; }
+  @keyframes bellPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.15); }
+  }
+  .tab.hidden { display: none !important; }
+
+  .view { display: none; }
+  .view.active { display: block; }
+  .form-box { background: #16213e; padding: 20px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.4); margin-bottom: 30px; }
+  .form-box[hidden] { display: none !important; }
+  .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; margin-bottom: 15px; }
+  label { display: block; font-size: 13px; color: #9fb3c8; margin-bottom: 5px; }
+  input[type="text"], input[type="url"], input[type="date"], input[type="password"], input[type="number"], textarea { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #2c3e60; background: #0f3460; color: #fff; font-size: 16px; outline: none; font-family: inherit; resize: vertical; }
+  input:focus, textarea:focus { border-color: #4fc3f7; }
+  textarea { min-height: 80px; }
+  input[type="number"] { -moz-appearance: textfield; }
+  input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .custom-select { position: relative; user-select: none; width: 100%; }
+  .custom-select-trigger { padding: 12px; border-radius: 8px; border: 1px solid #2c3e60; background: #0f3460; color: #fff; font-size: 16px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 10px; transition: 0.2s; word-break: break-word; }
+  .custom-select-trigger:hover { border-color: #4fc3f7; }
+  .custom-select.open .custom-select-trigger { border-color: #4fc3f7; }
+  .custom-select-trigger .arrow { transition: 0.25s; color: #4fc3f7; font-size: 12px; flex-shrink: 0; }
+  .custom-select.open .custom-select-trigger .arrow { transform: rotate(180deg); }
+  .custom-select-options { position: absolute; top: calc(100% + 6px); left: 0; right: 0; background: #0f3460; border: 1px solid #4fc3f7; border-radius: 10px; max-height: 280px; overflow-y: auto; z-index: 50; box-shadow: 0 10px 30px rgba(0,0,0,0.6); opacity: 0; transform: translateY(-8px); pointer-events: none; transition: 0.2s; }
+  .custom-select.open .custom-select-options { opacity: 1; transform: translateY(0); pointer-events: auto; }
+  .custom-select-options::-webkit-scrollbar { width: 8px; }
+  .custom-select-options::-webkit-scrollbar-track { background: #0a2540; border-radius: 10px; }
+  .custom-select-options::-webkit-scrollbar-thumb { background: #4fc3f7; border-radius: 10px; }
+  .custom-select-option { padding: 11px 14px; font-size: 14.5px; color: #cdd9e5; cursor: pointer; border-bottom: 1px solid #1a2c4a; transition: 0.15s; }
+  .custom-select-option:last-child { border-bottom: none; }
+  .custom-select-option:hover { background: #4fc3f7; color: #001f3f; }
+  .custom-select-option.selected { background: #2c3e60; color: #4fc3f7; font-weight: bold; }
+  .custom-select-option.selected:hover { background: #4fc3f7; color: #001f3f; }
+  .add-btn { width: 100%; padding: 14px 22px; border: none; border-radius: 8px; background: #4fc3f7; color: #001f3f; font-weight: bold; cursor: pointer; font-size: 16px; transition: 0.2s; font-family: inherit; }
+  .add-btn:hover { background: #29b6f6; }
+  .add-btn:active { transform: scale(0.98); }
+  .add-btn.red { background: #e94560; color: #fff; }
+  .add-btn.red:hover { background: #c73650; }
+  .add-btn.gold { background: #ffb300; color: #001f3f; }
+  .add-btn.gold:hover { background: #ffa000; }
+  .checkbox-wrap { display: flex; align-items: center; gap: 10px; padding: 12px; background: #0f3460; border: 1px solid #2c3e60; border-radius: 8px; cursor: pointer; user-select: none; transition: 0.2s; height: 46px; }
+  .checkbox-wrap:hover { border-color: #4fc3f7; }
+  .checkbox-wrap input { width: 18px; height: 18px; accent-color: #4fc3f7; cursor: pointer; }
+  .checkbox-wrap span { font-size: 15px; color: #cdd9e5; }
+  .search-box { margin-bottom: 20px; position: relative; }
+  .search-box input { padding-left: 44px; }
+  .search-box::before { content: "🔍"; position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-size: 16px; pointer-events: none; opacity: 0.7; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 20px; }
+  .card { background: #16213e; border-radius: 12px; padding: 18px; border-left: 6px solid #4fc3f7; box-shadow: 0 4px 15px rgba(0,0,0,0.3); transition: 0.3s; }
+  .card.warned { border-left-color: #e94560; background: #2a1622; }
+  .card.warned .nick { color: #ff6b81; }
+  .card.warned::after { content: "⚠ 3/3 ВЫГОВОРОВ"; display: block; margin-top: 10px; text-align: center; background: #e94560; color: #fff; padding: 6px; border-radius: 6px; font-weight: bold; font-size: 12px; letter-spacing: 1px; }
+  .card.my-card { box-shadow: 0 0 0 2px #4fc3f7, 0 4px 15px rgba(79, 195, 247, 0.3); }
+  .card.archived { border-left-color: #9fb3c8; background: #1a2238; opacity: 0.92; }
+  .card.archived .nick { color: #9fb3c8; }
+  .card.banned { border-left-color: #e94560; background: #2a1622; }
+  .card.invite-card { border-left-color: #ffb300; background: #2a230d; }
+  .card.used-card { border-left-color: #4a6285; background: #1a2238; opacity: 0.75; }
+  .card.account-card { border-left-color: #42a5f5; background: #102a3e; }
+  .card.account-card.owner-account { border-left-color: #ffb300; background: #2a230d; }
+  .nick { font-size: 20px; font-weight: bold; color: #4fc3f7; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; word-break: break-word; flex-wrap: wrap; }
+  .nick a { color: inherit; text-decoration: none; font-size: 15px; opacity: 0.7; }
+  .nick a:hover { opacity: 1; text-decoration: underline; }
+  .nick .me-tag { font-size: 11px; padding: 2px 8px; background: #4fc3f7; color: #001f3f; border-radius: 5px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; }
+  .nick .banned-tag { font-size: 11px; padding: 2px 8px; background: #e94560; color: #fff; border-radius: 5px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; }
+  .prefixes { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+  .prefix { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 6px; font-size: 11.5px; font-weight: bold; letter-spacing: 0.3px; text-transform: uppercase; white-space: nowrap; }
+  .prefix.vacation { background: #ffb74d; color: #4a2c00; }
+  .prefix.good { background: #66bb6a; color: #003300; }
+  .prefix.bad { background: #ef5350; color: #fff; }
+  .prefix.trial { background: #ab47bc; color: #fff; }
+  .prefix.newbie { background: #42a5f5; color: #fff; }
+  .achievements { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+  .achievement { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 6px; font-size: 11.5px; font-weight: bold; white-space: nowrap; background: linear-gradient(135deg, #4a3a0d 0%, #6b5213 100%); color: #ffd54f; border: 1px solid #ffb300; }
+  .achievement.badge-green { background: linear-gradient(135deg, #1b5e20 0%, #2e7d32 100%); color: #b9f6ca; border-color: #66bb6a; }
+  .achievement.badge-blue { background: linear-gradient(135deg, #0d2e4a 0%, #1565c0 100%); color: #90caf9; border-color: #42a5f5; }
+  .achievement.badge-purple { background: linear-gradient(135deg, #4a1e5a 0%, #7b1fa2 100%); color: #e1bee7; border-color: #ab47bc; }
+  .info-row { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; font-size: 14px; border-bottom: 1px dashed #2c3e60; gap: 10px; }
+  .info-row:last-of-type { border-bottom: none; }
+  .info-row > span:first-child { color: #9fb3c8; flex-shrink: 0; }
+  .info-row > span:last-child { text-align: right; word-break: break-word; }
+  .key-display { font-family: 'Consolas', 'Monaco', monospace; color: #ffd54f; background: #0f3460; padding: 6px 10px; border-radius: 6px; font-size: 13px; letter-spacing: 1px; word-break: break-all; display: inline-flex; align-items: center; gap: 8px; }
+  .copy-btn { background: #2c3e60; border: 1px solid #4fc3f7; color: #4fc3f7; padding: 3px 8px; border-radius: 5px; font-size: 11px; cursor: pointer; font-family: inherit; font-weight: bold; }
+  .copy-btn:hover { background: #4fc3f7; color: #001f3f; }
+  .notes-block { margin-top: 10px; padding: 10px 12px; background: #0f3460; border-radius: 8px; border-left: 3px solid #4fc3f7; font-size: 13.5px; color: #cdd9e5; line-height: 1.4; white-space: pre-wrap; word-break: break-word; }
+  .notes-block strong { display: block; font-size: 11px; text-transform: uppercase; color: #4fc3f7; margin-bottom: 4px; letter-spacing: 0.5px; }
+  .counter-controls { display: flex; align-items: center; gap: 8px; }
+  .counter-btn { width: 34px; height: 34px; border-radius: 8px; background: #0f3460; color: #4fc3f7; border: 1px solid #4fc3f7; font-weight: bold; cursor: pointer; padding: 0; font-size: 18px; line-height: 1; font-family: inherit; transition: 0.15s; }
+  .counter-btn:hover:not(:disabled) { background: #4fc3f7; color: #001f3f; }
+  .counter-btn:active:not(:disabled) { transform: scale(0.9); }
+  .counter-btn:disabled { opacity: 0.3; cursor: not-allowed; border-color: #2c3e60; color: #445; }
+  .counter-btn.plus { background: #1b5e20; color: #b9f6ca; border-color: #1b5e20; }
+  .counter-btn.plus:hover:not(:disabled) { background: #2e7d32; color: #fff; border-color: #2e7d32; }
+  .counter-val { min-width: 36px; text-align: center; font-weight: bold; }
+  .card-actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  .card-actions button { flex: 1; padding: 10px; font-size: 13.5px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-family: inherit; transition: 0.2s; min-width: 100px; }
+  .edit-btn { background: #2c3e60; color: #4fc3f7; border: 1px solid #4fc3f7 !important; }
+  .edit-btn:hover { background: #4fc3f7; color: #001f3f; }
+  .remove-btn { background: #e94560; color: #fff; }
+  .remove-btn:hover { background: #c73650; }
+  .restore-btn { background: #1b5e20; color: #b9f6ca; }
+  .restore-btn:hover { background: #2e7d32; }
+  .notes-btn { background: #2c3e60; color: #cdd9e5; border: 1px solid #4a6285 !important; }
+  .notes-btn:hover { background: #4a6285; color: #fff; }
+  .role-btn { background: #42a5f5; color: #001f3f; }
+  .role-btn:hover { background: #1e88e5; color: #fff; }
+  .empty { text-align: center; color: #667; padding: 40px 20px; font-size: 16px; }
+  .badge-label { display: inline-block; padding: 3px 10px; border-radius: 6px; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; }
+  .badge-label.forever { background: #e94560; color: #fff; }
+  .badge-label.temp { background: #2c3e60; color: #4fc3f7; }
+  .badge-label.active { background: #1b5e20; color: #b9f6ca; }
+  .badge-label.used { background: #2c3e60; color: #9fb3c8; }
+  .badge-label.owner { background: #ffb300; color: #001f3f; }
+  .badge-label.admin { background: #42a5f5; color: #001f3f; }
+  .badge-label.matched { background: #1b5e20; color: #b9f6ca; }
+  .badge-label.unmatched { background: #4a3a0d; color: #ffd54f; }
+
+  /* ==================== УВЕДОМЛЕНИЯ ==================== */
+  .notif-item { display: flex; gap: 12px; background: #16213e; border-radius: 10px; padding: 14px 16px; border-left: 4px solid #4fc3f7; box-shadow: 0 3px 10px rgba(0,0,0,0.25); transition: 0.2s; cursor: pointer; }
+  .notif-item:hover { background: #1a3a6b; }
+  .notif-item.unread { border-left-color: #ffb300; background: #2a230d; }
+  .notif-item.unread:hover { background: #3a3015; }
+  .notif-item.points { border-left-color: #42a5f5; }
+  .notif-item.warnings { border-left-color: #ff7043; }
+  .notif-item.removed { border-left-color: #e94560; }
+  .notif-item.ban { border-left-color: #ab47bc; }
+  .notif-item.unban { border-left-color: #66bb6a; }
+  .notif-item.created { border-left-color: #4fc3f7; }
+  .notif-item.restored { border-left-color: #ffb74d; }
+  .notif-item.account { border-left-color: #ffb300; }
+  .notif-item.role { border-left-color: #42a5f5; }
+  .notif-item.prefix { border-left-color: #ab47bc; }
+  .notif-icon { font-size: 24px; flex-shrink: 0; line-height: 1; }
+  .notif-body { flex: 1; min-width: 0; }
+  .notif-text { color: #cdd9e5; font-size: 14px; line-height: 1.5; word-break: break-word; margin-bottom: 4px; }
+  .notif-text b { color: #4fc3f7; }
+  .notif-time { font-size: 11.5px; color: #667; }
+  .notif-badge { display: inline-block; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 4px; margin-left: 6px; text-transform: uppercase; letter-spacing: 0.3px; }
+  .notif-badge.new { background: #ffb300; color: #001f3f; }
+  .notif-section { margin-bottom: 24px; }
+  .notif-section h3 { margin: 0 0 12px; color: #4fc3f7; font-size: 16px; display: flex; align-items: center; gap: 8px; }
+  .notif-list { display: flex; flex-direction: column; gap: 10px; }
+  .notif-actions { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+  .notif-actions button { padding: 10px 18px; border: 1px solid #2c3e60; border-radius: 8px; background: #16213e; color: #cdd9e5; font-size: 13.5px; font-weight: bold; cursor: pointer; font-family: inherit; transition: 0.2s; }
+  .notif-actions button:hover { border-color: #4fc3f7; color: #4fc3f7; }
+  .notif-actions button.danger:hover { border-color: #e94560; color: #e94560; }
+
+  /* ==================== ДАШБОРД ==================== */
+  .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 28px; }
+  .stat-card { background: #16213e; border-radius: 12px; padding: 18px 20px; border-left: 5px solid #4fc3f7; box-shadow: 0 4px 15px rgba(0,0,0,0.3); transition: 0.2s; }
+  .stat-card:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.4); }
+  .stat-card.blue { border-left-color: #4fc3f7; }
+  .stat-card.gold { border-left-color: #ffb300; }
+  .stat-card.green { border-left-color: #66bb6a; }
+  .stat-card.red { border-left-color: #e94560; }
+  .stat-card.purple { border-left-color: #ab47bc; }
+  .stat-label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.6px; color: #9fb3c8; margin-bottom: 6px; }
+  .stat-value { font-size: 30px; font-weight: bold; color: #fff; line-height: 1.1; }
+  .stat-sub { font-size: 12px; color: #667; margin-top: 6px; }
+  .dashboard-section { background: #16213e; border-radius: 12px; padding: 18px 20px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+  .dashboard-section h3 { margin: 0 0 14px; color: #4fc3f7; font-size: 16px; display: flex; align-items: center; gap: 8px; }
+  .rank-list { display: flex; flex-direction: column; gap: 8px; }
+  .rank-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; background: #0f3460; border-radius: 8px; transition: 0.15s; }
+  .rank-item:hover { background: #1a3a6b; }
+  .rank-num { flex-shrink: 0; width: 34px; height: 34px; border-radius: 8px; background: #2c3e60; color: #cdd9e5; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px; }
+  .rank-num.gold { background: linear-gradient(135deg, #ffb300, #ff8f00); color: #001f3f; }
+  .rank-num.silver { background: linear-gradient(135deg, #cfd8dc, #90a4ae); color: #001f3f; }
+  .rank-num.bronze { background: linear-gradient(135deg, #d84315, #8d3a12); color: #fff; }
+  .rank-name { flex: 1; min-width: 0; font-weight: bold; color: #cdd9e5; font-size: 14.5px; word-break: break-word; }
+  .rank-pos { font-size: 12px; color: #667; font-weight: normal; margin-top: 2px; }
+  .rank-value { flex-shrink: 0; font-weight: bold; color: #4fc3f7; font-size: 14.5px; }
+  .rank-value.minus { color: #ff6b81; }
+  .hierarchy-bar { display: flex; flex-direction: column; gap: 8px; }
+  .hierarchy-row { display: grid; grid-template-columns: minmax(140px, 1fr) 40px 2fr; align-items: center; gap: 12px; font-size: 13.5px; }
+  .hierarchy-row .h-pos { color: #cdd9e5; word-break: break-word; }
+  .hierarchy-row .h-count { text-align: center; font-weight: bold; color: #4fc3f7; background: #0f3460; border-radius: 6px; padding: 2px 0; }
+  .h-bar { background: #0f3460; border-radius: 6px; height: 12px; overflow: hidden; }
+  .h-bar-inner { height: 100%; background: linear-gradient(90deg, #4fc3f7, #42a5f5); border-radius: 6px; transition: width 0.4s; }
+
+  /* ==================== ЛОГИ ==================== */
+  .log-actions { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+  .log-actions button { padding: 10px 18px; border: 1px solid #2c3e60; border-radius: 8px; background: #16213e; color: #cdd9e5; font-size: 13.5px; font-weight: bold; cursor: pointer; font-family: inherit; transition: 0.2s; }
+  .log-actions button:hover { border-color: #4fc3f7; color: #4fc3f7; }
+  .log-actions button.danger { color: #ff8a80; border-color: #4a1e0d; }
+  .log-actions button.danger:hover { border-color: #e94560; color: #e94560; background: #2a1622; }
+  .log-list { display: flex; flex-direction: column; gap: 10px; }
+  .log-entry { background: #16213e; border-radius: 10px; padding: 12px 16px; border-left: 4px solid #4fc3f7; box-shadow: 0 3px 10px rgba(0,0,0,0.25); font-size: 14px; }
+  .log-entry.points { border-left-color: #42a5f5; }
+  .log-entry.warnings { border-left-color: #ff7043; }
+  .log-entry.removed { border-left-color: #e94560; }
+  .log-entry.ban { border-left-color: #ab47bc; }
+  .log-entry.unban { border-left-color: #66bb6a; }
+  .log-entry.created { border-left-color: #4fc3f7; }
+  .log-entry.restored { border-left-color: #ffb74d; }
+  .log-entry.account { border-left-color: #ffb300; }
+  .log-entry.blocked { border-left-color: #e94560; background: #2a1622; }
+  .log-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 6px; flex-wrap: wrap; }
+  .log-type { font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; padding: 3px 9px; background: #0f3460; color: #4fc3f7; border-radius: 5px; }
+  .log-time { font-size: 11.5px; color: #667; }
+  .log-text { color: #cdd9e5; line-height: 1.5; word-break: break-word; }
+  .log-text b { color: #4fc3f7; }
+  .log-text .plus { color: #66bb6a; font-weight: bold; }
+  .log-text .minus { color: #ff6b81; font-weight: bold; }
+
+  /* ==================== ПРЕФИКС-ПИКЕР ==================== */
+  .prefix-picker button { font-size: 13px; }
+
+  /* ==================== ЗАБЛОКИРОВАНО ==================== */
+  .container.locked .form-box { display: none !important; }
+  .container.locked .remove-btn,
+  .container.locked .edit-btn,
+  .container.locked .restore-btn,
+  .container.locked .notes-btn,
+  .container.locked .role-btn,
+  .container.locked .counter-btn { display: none !important; }
+  .container.locked .counter-controls { pointer-events: none; opacity: 0.5; }
+
+  /* ==================== МОДАЛКИ ==================== */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(10, 15, 30, 0.75); backdrop-filter: blur(5px); display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 1000; opacity: 0; pointer-events: none; transition: 0.2s; overflow-y: auto; }
+  .modal-overlay.show { opacity: 1; pointer-events: auto; }
+  .modal { background: #16213e; border: 1px solid #2c3e60; border-radius: 14px; padding: 24px; max-width: 460px; width: 100%; box-shadow: 0 20px 60px rgba(0,0,0,0.7), 0 0 0 1px rgba(79, 195, 247, 0.15); transform: scale(0.9); transition: 0.25s; margin: auto; color: #eee; }
+  .modal-overlay.show .modal { transform: scale(1); }
+  .modal h3 { margin: 0 0 16px; color: #4fc3f7; font-size: 20px; display: flex; align-items: center; gap: 10px; }
+  .modal.danger h3 { color: #e94560; }
+  .modal.gold h3 { color: #ffb300; }
+  .modal.green h3 { color: #66bb6a; }
+  .modal p { margin: 0 0 18px; color: #cdd9e5; font-size: 15px; line-height: 1.5; }
+  .modal p b { color: #4fc3f7; }
+  .modal .modal-field { margin-bottom: 15px; }
+  .modal .modal-field:last-of-type { margin-bottom: 20px; }
+  .modal input, .modal textarea { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #2c3e60; background: #0f3460; color: #fff; font-size: 16px; outline: none; font-family: inherit; resize: vertical; }
+  .modal input:focus, .modal textarea:focus { border-color: #4fc3f7; box-shadow: 0 0 0 3px rgba(79, 195, 247, 0.15); }
+  .modal input::placeholder, .modal textarea::placeholder { color: #5a7093; }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+  .modal-btn { padding: 11px 22px; border-radius: 8px; border: none; font-size: 15px; font-weight: bold; cursor: pointer; font-family: inherit; transition: 0.2s; }
+  .modal-btn.cancel { background: #0f3460; color: #cdd9e5; border: 1px solid #2c3e60; }
+  .modal-btn.cancel:hover { background: #2c3e60; color: #fff; border-color: #4fc3f7; }
+  .modal-btn.confirm { background: #e94560; color: #fff; }
+  .modal-btn.confirm:hover:not(:disabled) { background: #c73650; }
+  .modal-btn.save { background: #4fc3f7; color: #001f3f; }
+  .modal-btn.save:hover:not(:disabled) { background: #29b6f6; }
+  .modal-btn.gold { background: #ffb300; color: #001f3f; }
+  .modal-btn.gold:hover:not(:disabled) { background: #ffa000; }
+  .modal-btn:active:not(:disabled) { transform: scale(0.97); }
+  .modal-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .hint { font-size: 12px; color: #667; margin-top: 6px; display: block; }
+  .required-star { color: #e94560; }
+  .amount-preview { margin-top: 8px; padding: 10px 14px; background: #0f3460; border-radius: 8px; font-size: 14px; text-align: center; border: 1px dashed #2c3e60; }
+  .amount-preview.plus { border-color: #66bb6a; color: #a5d6a7; }
+  .amount-preview.minus { border-color: #ef5350; color: #ff8a80; }
+  .amount-preview.neutral { color: #9fb3c8; }
+  .amount-preview.blocked { border-color: #e94560; color: #ff8a80; background: #2a1622; }
+  .quick-amounts { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .quick-amount { padding: 6px 12px; background: #0f3460; border: 1px solid #2c3e60; border-radius: 6px; color: #cdd9e5; font-size: 13px; font-weight: bold; cursor: pointer; font-family: inherit; transition: 0.15s; }
+  .quick-amount:hover { border-color: #4fc3f7; color: #4fc3f7; }
+  .quick-amount.neg { color: #ff8a80; border-color: #4a1e0d; }
+  .quick-amount.neg:hover { border-color: #ef5350; color: #ef5350; }
+  .status { position: fixed; top: 12px; right: 12px; padding: 8px 14px; border-radius: 8px; font-size: 13px; z-index: 2000; background: #2c3e60; color: #cdd9e5; opacity: 0; transition: 0.3s; pointer-events: none; max-width: 360px; }
+  .status.show { opacity: 1; }
+  .status.ok { background: #1b5e20; color: #b9f6ca; }
+  .status.err { background: #b71c1c; color: #ffcdd2; }
+  .register-link { text-align: center; margin-top: 16px; padding-top: 16px; border-top: 1px dashed #2c3e60; }
+  .register-link p { margin: 0 0 10px; color: #9fb3c8; font-size: 13.5px; }
+  .register-link button { padding: 10px 24px; background: transparent; border: 1px solid #4fc3f7; color: #4fc3f7; border-radius: 8px; font-size: 14px; font-weight: bold; cursor: pointer; font-family: inherit; transition: 0.2s; }
+  .register-link button:hover { background: #4fc3f7; color: #001f3f; }
+  .register-steps { display: flex; justify-content: center; gap: 8px; margin-bottom: 20px; }
+  .register-step { width: 30px; height: 30px; border-radius: 50%; background: #0f3460; color: #667; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px; border: 2px solid #2c3e60; transition: 0.2s; }
+  .register-step.active { background: #4fc3f7; color: #001f3f; border-color: #4fc3f7; }
+  .register-step.done { background: #1b5e20; color: #b9f6ca; border-color: #1b5e20; }
+  .invite-preview { background: #0f3460; border: 1px dashed #4fc3f7; border-radius: 10px; padding: 14px; text-align: center; margin-bottom: 18px; }
+  .invite-preview .preview-label { font-size: 11px; text-transform: uppercase; color: #667; letter-spacing: 1px; margin-bottom: 6px; }
+  .invite-preview .preview-nick { font-size: 20px; font-weight: bold; color: #4fc3f7; word-break: break-word; }
+  .invite-preview .preview-pos { font-size: 13.5px; color: #cdd9e5; margin-top: 4px; }
+
+  /* ==================== АДАПТИВ ==================== */
+  @media (max-width: 1024px) {
+    body { padding: 16px; }
+    h1 { font-size: 24px; margin-bottom: 18px; }
+    .form-grid { grid-template-columns: repeat(2, 1fr); }
+    .cards { grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 16px; }
+  }
+  @media (max-width: 640px) {
+    body { padding: 12px; }
+    h1 { font-size: 20px; margin-bottom: 14px; }
+    .auth-bar { margin-bottom: 12px; }
+    .auth-status { font-size: 12px; padding: 6px 10px; }
+    .tabs { padding: 5px; gap: 5px; margin-bottom: 16px; }
+    .tab { padding: 10px 12px; font-size: 13px; gap: 6px; }
+    .tab .badge { min-width: 20px; height: 18px; padding: 0 6px; font-size: 10.5px; }
+    .form-box { padding: 14px; border-radius: 10px; margin-bottom: 20px; }
+    .form-grid { grid-template-columns: 1fr; gap: 12px; margin-bottom: 14px; }
+    .cards { grid-template-columns: 1fr; gap: 14px; }
+    .card { padding: 14px; border-left-width: 5px; }
+    .nick { font-size: 18px; }
+    .info-row { font-size: 13.5px; }
+    .counter-btn { width: 40px; height: 40px; font-size: 20px; }
+    .counter-val { min-width: 40px; font-size: 16px; }
+    .card-actions button { padding: 12px; font-size: 14px; }
+    .custom-select-options { max-height: 220px; }
+    .custom-select-option { padding: 13px 14px; font-size: 15px; }
+    .modal { padding: 20px; }
+    .modal-actions { flex-direction: column; }
+    .modal-btn { width: 100%; padding: 13px; }
+    .status { top: 8px; right: 8px; left: 8px; max-width: none; font-size: 12.5px; }
+    .connection-status { top: 8px; left: 8px; font-size: 11.5px; padding: 6px 10px; }
+    .stat-value { font-size: 24px; }
+    .dashboard-section { padding: 14px; }
+    .rank-item { padding: 8px 10px; gap: 8px; }
+    .rank-num { width: 30px; height: 30px; font-size: 12px; }
+    .hierarchy-row { grid-template-columns: 1fr 34px; }
+    .hierarchy-row .h-bar { grid-column: 1 / -1; }
+  }
+  @media (max-width: 360px) {
+    body { padding: 8px; }
+    h1 { font-size: 18px; }
+    .card { padding: 12px; }
+    .info-row { font-size: 13px; }
+    .counter-btn { width: 36px; height: 36px; font-size: 18px; }
+    .tab { font-size: 12px; padding: 9px 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="status" id="status"></div>
+
+<div class="connection-status" id="connectionStatus">
+  <span class="dot"></span>
+  <span id="connectionText">Соединение...</span>
+</div>
+
+<div class="container">
+  <h1>🛡 Управление администрацией</h1>
+
+  <div class="auth-bar">
+    <span class="auth-status" id="authStatus">🔒 Только просмотр</span>
+    <button class="auth-btn bell" id="bellBtn" onclick="switchTab('notifications')" style="display:none;" title="Уведомления">
+      🔔<span class="bell-count" id="bellCount" style="display:none;">0</span>
+    </button>
+    <button class="auth-btn refresh" onclick="refreshData()" title="Обновить данные">🔄 Обновить</button>
+    <button class="auth-btn login" id="loginBtn" onclick="openLogin()">🔓 Войти</button>
+    <button class="auth-btn logout" id="logoutBtn" onclick="logout()" style="display:none;">Выйти</button>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('dashboard')" id="tab-dashboard">📊 Дашборд</button>
+    <button class="tab" onclick="switchTab('admins')" id="tab-admins">🛡 Администрация <span class="badge" id="badge-admins">0</span></button>
+    <button class="tab" onclick="switchTab('archive')" id="tab-archive">📦 Архив <span class="badge" id="badge-archive">0</span></button>
+    <button class="tab" onclick="switchTab('bans')" id="tab-bans">🚫 ЧС <span class="badge red" id="badge-bans">0</span></button>
+    <button class="tab" onclick="switchTab('logs')" id="tab-logs">📜 Логи <span class="badge" id="badge-logs">0</span></button>
+    <button class="tab hidden" onclick="switchTab('notifications')" id="tab-notifications">🔔 Уведомления <span class="badge pulse" id="badge-notifications">0</span></button>
+    <button class="tab hidden" onclick="switchTab('accounts')" id="tab-accounts">🎫 Приглашения <span class="badge gold" id="badge-accounts">0</span></button>
+    <button class="tab hidden" onclick="switchTab('users')" id="tab-users">👤 Аккаунты <span class="badge blue" id="badge-users">0</span></button>
+  </div>
+
+  <div class="view active" id="view-dashboard">
+    <div class="dashboard-grid" id="dashboardStats"></div>
+    <div class="dashboard-section"><h3>🏆 Топ по баллам</h3><div class="rank-list" id="topPoints"></div></div>
+    <div class="dashboard-section"><h3>⚠ Антирейтинг по выговорам</h3><div class="rank-list" id="topWarnings"></div></div>
+    <div class="dashboard-section"><h3>📊 Должности</h3><div class="hierarchy-bar" id="hierarchyStats"></div></div>
+  </div>
+
+  <div class="view" id="view-admins">
+    <div class="form-box" id="addAdminFormBox" hidden>
+      <div class="form-grid">
+        <div><label>Ник администратора <span class="required-star">*</span></label><input type="text" id="nick" placeholder="Например: SuperAdmin"></div>
+        <div><label>Ссылка на ВК <span class="required-star">*</span></label><input type="url" id="link" placeholder="https://vk.com/id123 или vk.ru/username"></div>
+        <div>
+          <label>Должность</label>
+          <div class="custom-select" id="positionSelect">
+            <div class="custom-select-trigger"><span class="custom-select-value">Модератор</span><span class="arrow">▼</span></div>
+            <div class="custom-select-options" id="positionOptions"></div>
+          </div>
+          <span class="hint" id="addPositionHint"></span>
+        </div>
+        <div><label>Дата вступления на пост</label><input type="date" id="date"></div>
+        <div style="grid-column: 1 / -1;"><label>Примечания (необязательно)</label><textarea id="notes" placeholder="Дополнительная информация..."></textarea></div>
+      </div>
+      <button class="add-btn" onclick="addAdmin()">➕ Добавить администратора</button>
+    </div>
+    <div class="search-box"><input type="text" id="searchAdmins" placeholder="Поиск по нику или должности..." oninput="renderAdmins()"></div>
+    <div class="cards" id="cards-admins"></div>
+    <div class="empty" id="empty-admins">Пока нет администраторов.</div>
+    <div class="empty" id="noResultsAdmins" style="display:none;">🔍 Ничего не найдено</div>
+  </div>
+
+  <div class="view" id="view-archive">
+    <div class="search-box"><input type="text" id="searchArchive" placeholder="Поиск по архиву..." oninput="renderArchive()"></div>
+    <div class="cards" id="cards-archive"></div>
+    <div class="empty" id="empty-archive">Архив пуст.</div>
+    <div class="empty" id="noResultsArchive" style="display:none;">🔍 Ничего не найдено</div>
+  </div>
+
+  <div class="view" id="view-bans">
+    <div class="form-box" id="addBanFormBox" hidden>
+      <div class="form-grid">
+        <div><label>ВК человека <span class="required-star">*</span></label><input type="url" id="banVk" placeholder="https://vk.com/id123 или vk.ru/username"></div>
+        <div><label>Ник <span class="required-star">*</span></label><input type="text" id="banNick" placeholder="Ник нарушителя"></div>
+        <div><label>Причина <span class="required-star">*</span></label><input type="text" id="banReason" placeholder="Например: слив, скам"></div>
+        <div><label>С какой даты</label><input type="date" id="banFrom"></div>
+        <div><label>По какую дату</label><input type="date" id="banTo" disabled></div>
+        <div>
+          <label>Бессрочно</label>
+          <label class="checkbox-wrap"><input type="checkbox" id="banForever" onchange="toggleForever()"><span>Навсегда</span></label>
+        </div>
+      </div>
+      <button class="add-btn red" onclick="addBan()">🚫 Добавить в ЧС</button>
+    </div>
+    <div class="search-box"><input type="text" id="searchBans" placeholder="Поиск по ЧС..." oninput="renderBans()"></div>
+    <div class="cards" id="cards-bans"></div>
+    <div class="empty" id="empty-bans">Чёрный список пуст.</div>
+    <div class="empty" id="noResultsBans" style="display:none;">🔍 Ничего не найдено</div>
+  </div>
+
+  <div class="view" id="view-logs">
+    <div class="log-actions">
+      <button class="danger" onclick="clearLogs()">🗑 Очистить логи</button>
+      <button onclick="renderLogs()">🔄 Обновить</button>
+    </div>
+    <div class="search-box"><input type="text" id="searchLogs" placeholder="Поиск по логам..." oninput="renderLogs()"></div>
+    <div class="log-list" id="log-list"></div>
+    <div class="empty" id="empty-logs">Логов пока нет.</div>
+    <div class="empty" id="noResultsLogs" style="display:none;">🔍 Ничего не найдено</div>
+  </div>
+
+  <div class="view" id="view-notifications">
+    <div class="notif-actions">
+      <button onclick="markAllNotificationsRead()">✓ Прочитать все</button>
+      <button class="danger" onclick="clearMyNotifications()">🗑 Очистить все</button>
+    </div>
+
+    <div class="notif-section">
+      <h3>🔔 Мои уведомления <span id="notifCount" style="color:#9fb3c8;font-size:13px;"></span></h3>
+      <div class="notif-list" id="notifList"></div>
+      <div class="empty" id="empty-notifications">Уведомлений пока нет.</div>
+    </div>
+  </div>
+
+  <div class="view" id="view-accounts">
+    <div class="form-box" id="addInviteFormBox" hidden>
+      <div class="form-grid">
+        <div><label>Ник для приглашённого <span class="required-star">*</span></label><input type="text" id="accNick" placeholder="Например: VasyaAdmin"><span class="hint">Должен совпадать с ником в списке администрации</span></div>
+        <div>
+          <label>Должность</label>
+          <div class="custom-select" id="accPositionSelect">
+            <div class="custom-select-trigger"><span class="custom-select-value">Модератор</span><span class="arrow">▼</span></div>
+            <div class="custom-select-options" id="accPositionOptions"></div>
+          </div>
+          <span class="hint" id="accPositionHint"></span>
+        </div>
+      </div>
+      <button class="add-btn gold" onclick="addInvite()">🎫 Создать пригласительный ключ</button>
+      <span class="hint" style="margin-top:10px;">Приглашённый введёт только ключ и придумает пароль — ник и должность подставятся автоматически.</span>
+    </div>
+    <div class="search-box"><input type="text" id="searchAccounts" placeholder="Поиск по нику или должности..." oninput="renderAccounts()"></div>
+    <div class="cards" id="cards-accounts"></div>
+    <div class="empty" id="empty-accounts">Нет созданных приглашений.</div>
+    <div class="empty" id="noResultsAccounts" style="display:none;">🔍 Ничего не найдено</div>
+  </div>
+
+  <div class="view" id="view-users">
+    <div class="search-box"><input type="text" id="searchUsers" placeholder="Поиск по нику или должности..." oninput="renderUsers()"></div>
+    <div class="cards" id="cards-users"></div>
+    <div class="empty" id="empty-users">Зарегистрированных аккаунтов пока нет.</div>
+    <div class="empty" id="noResultsUsers" style="display:none;">🔍 Ничего не найдено</div>
+  </div>
+</div>
+
+<!-- МОДАЛКИ -->
+<div class="modal-overlay" id="loginModal">
+  <div class="modal gold">
+    <h3>🔓 Вход</h3>
+    <p>Введите ник и пароль.<br>Или войдите как <b>Администратор</b> по мастер-паролю.</p>
+    <div class="modal-field"><label>Ник</label><input type="text" id="loginNick" placeholder="Ваш ник" onkeydown="if(event.key==='Enter')document.getElementById('loginPassword').focus()"></div>
+    <div class="modal-field"><label>Пароль</label><input type="password" id="loginPassword" placeholder="Пароль" onkeydown="if(event.key==='Enter')submitLogin()"></div>
+    <div class="modal-actions">
+      <button class="modal-btn cancel" onclick="closeLogin()">Отмена</button>
+      <button class="modal-btn gold" onclick="submitLogin()">Войти</button>
+    </div>
+    <div class="register-link"><p>Есть пригласительный ключ?</p><button onclick="openRegister()">📝 Зарегистрироваться</button></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="registerModal">
+  <div class="modal gold">
+    <h3>📝 Регистрация — Шаг 1 из 2</h3>
+    <div class="register-steps"><div class="register-step active">1</div><div class="register-step">2</div></div>
+    <p>Введите <b>пригласительный ключ</b>, который выдал вам администратор.</p>
+    <div class="modal-field"><label>Пригласительный ключ <span class="required-star">*</span></label><input type="text" id="regKey" placeholder="Например: A7K-9XQ-2MF" onkeydown="if(event.key==='Enter')checkInvite()" style="text-transform:uppercase;"></div>
+    <div class="modal-actions">
+      <button class="modal-btn cancel" onclick="closeRegister()">Отмена</button>
+      <button class="modal-btn gold" onclick="checkInvite()">Далее →</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="registerStep2Modal">
+  <div class="modal gold">
+    <h3>📝 Регистрация — Шаг 2 из 2</h3>
+    <div class="register-steps"><div class="register-step done">✓</div><div class="register-step active">2</div></div>
+    <p>Ключ принят! Ваш аккаунт подготовлен:</p>
+    <div class="invite-preview">
+      <div class="preview-label">Ваш ник</div>
+      <div class="preview-nick" id="regNickPreview">—</div>
+      <div class="preview-pos" id="regPositionPreview">—</div>
+    </div>
+    <p style="color:#9fb3c8;font-size:13.5px;">Придумайте пароль для входа.</p>
+    <div class="modal-field"><label>Пароль <span class="required-star">*</span></label><input type="password" id="regPass1" placeholder="Минимум 3 символа" onkeydown="if(event.key==='Enter')document.getElementById('regPass2').focus()"></div>
+    <div class="modal-field"><label>Повторите пароль <span class="required-star">*</span></label><input type="password" id="regPass2" placeholder="Повторите пароль" onkeydown="if(event.key==='Enter')completeRegister()"></div>
+    <div class="modal-actions">
+      <button class="modal-btn cancel" onclick="backToStep1()">← Назад</button>
+      <button class="modal-btn gold" onclick="completeRegister()">✓ Завершить</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="counterModal">
+  <div class="modal" id="counterModalBox">
+    <h3 id="counterTitle">💠 Изменить баллы</h3>
+    <p>Администратор: <b id="counterNick"></b><br>Текущее значение: <b id="counterCurrent"></b></p>
+    <div class="modal-field">
+      <label>Количество <span class="required-star">*</span></label>
+      <input type="number" id="counterAmount" placeholder="Например: 5 или -3" oninput="updateCounterPreview()">
+      <div class="quick-amounts" id="quickAmounts"></div>
+      <span class="hint" id="counterHint">Отрицательное число — отнимает.</span>
+    </div>
+    <div class="modal-field">
+      <label>Причина <span class="required-star">*</span></label>
+      <textarea id="counterReason" placeholder="Например: за активную работу..." oninput="updateCounterPreview()"></textarea>
+      <span class="hint">Обязательное поле. Минимум 3 символа.</span>
+    </div>
+    <div class="amount-preview neutral" id="counterPreview">Введите количество и причину</div>
+    <div class="modal-actions" style="margin-top:20px;">
+      <button class="modal-btn cancel" onclick="closeCounter()">Отмена</button>
+      <button class="modal-btn save" id="counterSubmitBtn" onclick="submitCounter()" disabled>Применить</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="confirmModal">
+  <div class="modal danger">
+    <h3>⬇ Снять администратора?</h3>
+    <p>Вы собираетесь снять <b id="modalNick"></b>.<br>Укажите причину — она сохранится в архиве.</p>
+    <div class="modal-field">
+      <label>Причина снятия <span class="required-star">*</span></label>
+      <textarea id="removeReason" placeholder="Например: нарушение правил..." oninput="updateRemoveBtn()"></textarea>
+      <span class="hint">Минимум 3 символа.</span>
+    </div>
+    <div class="modal-actions">
+      <button class="modal-btn cancel" onclick="closeConfirm()">Отмена</button>
+      <button class="modal-btn confirm" id="confirmRemoveBtn" onclick="confirmDelete()" disabled>Снять</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="editModal">
+  <div class="modal">
+    <h3>✏ Редактировать администратора</h3>
+    <div class="modal-field"><label>Ник</label><input type="text" id="editNick" placeholder="Ник"></div>
+    <div class="modal-field"><label>Ссылка на ВК</label><input type="url" id="editLink" placeholder="https://vk.com/id123"></div>
+    <div class="modal-field">
+      <label>Должность</label>
+      <div class="custom-select" id="editPositionSelect">
+        <div class="custom-select-trigger"><span class="custom-select-value">Модератор</span><span class="arrow">▼</span></div>
+        <div class="custom-select-options" id="editPositionOptions"></div>
+      </div>
+      <span class="hint" id="editPositionHint"></span>
+    </div>
+    <div class="modal-field"><label>Дата вступления на пост</label><input type="date" id="editDate"></div>
+    <div class="modal-field"><label>Примечания</label><textarea id="editNotes" placeholder="Заметки..."></textarea></div>
+    <div class="modal-actions">
+      <button class="modal-btn cancel" onclick="closeEdit()">Отмена</button>
+      <button class="modal-btn save" onclick="saveEdit()">💾 Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="notesModal">
+  <div class="modal">
+    <h3>📝 Примечания</h3>
+    <p>Заметки для <b id="notesNick"></b></p>
+    <div class="modal-field"><textarea id="notesText" placeholder="Введите примечания..."></textarea></div>
+    <div class="modal-actions">
+      <button class="modal-btn cancel" onclick="closeNotes()">Отмена</button>
+      <button class="modal-btn save" onclick="saveNotes()">💾 Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="prefixModal">
+  <div class="modal">
+    <h3>🏷 Управление префиксами</h3>
+    <p>Выберите префиксы для <b id="prefixNick"></b></p>
+    <div class="prefix-picker" id="prefixPicker" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+    <span class="hint">Нажмите, чтобы добавить / убрать.</span>
+    <div class="modal-actions" style="margin-top:20px;">
+      <button class="modal-btn save" onclick="closePrefix()">✓ Готово</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="unbanModal">
+  <div class="modal">
+    <h3>✅ Снять с ЧС?</h3>
+    <p>Убрать <b id="unbanNick"></b> из чёрного списка?</p>
+    <div class="modal-actions">
+      <button class="modal-btn cancel" onclick="closeUnban()">Отмена</button>
+      <button class="modal-btn save" onclick="confirmUnban()">Снять с ЧС</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="deleteAccModal">
+  <div class="modal danger">
+    <h3>🗑 Удалить приглашение?</h3>
+    <p>Удалить приглашение для <b id="deleteAccNick"></b>?<br>Ключ перестанет работать.</p>
+    <div class="modal-actions">
+      <button class="modal-btn cancel" onclick="closeDeleteAcc()">Отмена</button>
+      <button class="modal-btn confirm" onclick="confirmDeleteAcc()">Удалить</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="editUserRoleModal">
+  <div class="modal">
+    <h3>✏ Изменить роль аккаунта</h3>
+    <p>Аккаунт: <b id="editUserRoleNick"></b></p>
+    <div class="modal-field">
+      <label>Новая должность</label>
+      <div class="custom-select" id="editUserRoleSelect">
+        <div class="custom-select-trigger"><span class="custom-select-value">Модератор</span><span class="arrow">▼</span></div>
+        <div class="custom-select-options" id="editUserRoleOptions"></div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="modal-btn cancel" onclick="closeEditUserRole()">Отмена</button>
+      <button class="modal-btn save" onclick="saveUserRole()">💾 Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="deleteUserModal">
+  <div class="modal danger">
+    <h3>🗑 Удалить аккаунт?</h3>
+    <p>Удалить аккаунт <b id="deleteUserNick"></b>?<br>Пользователь больше не сможет войти.</p>
+    <div class="modal-actions">
+      <button class="modal-btn cancel" onclick="closeDeleteUser()">Отмена</button>
+      <button class="modal-btn confirm" onclick="confirmDeleteUser()">Удалить</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+
+<script>
+/* ============================================================
+   НАСТРОЙКИ SUPABASE
+   ============================================================ */
+const SUPABASE_URL = "https://cykiulkhsrprqufykngr.supabase.co";
+const SUPABASE_KEY = "sb_publishable_9Qxpcs3DhIFRNTeNmh8A2g_QomfwohM";
+
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const OWNER_PASSWORD = "admin";
+const OWNER_NICK = "Администратор";
+
+const HIERARCHY = [
+  'Администратор', 'Владелец', 'Заместитель Владельца', 'Основатель',
+  'Главный Заместитель Основателя', 'Заместитель Основателя',
+  'Руководитель Проектов', 'Помощник Руководителя проекта',
+  'Команда Проекта', 'Спец Администратор', 'Заместитель Спец Администратора',
+  'Главный Администратор', 'Основной Заместителя Главного Администратора',
+  'Заместитель Главного Администратора', 'Куратор Администрации',
+  'Старший Администратор', 'Администратор Системы', 'Младший Администратор', 'Модератор'
+];
+
+const OWNER_ROLES = ['Администратор', 'Владелец'];
+const ADD_MIN_POSITION  = 'Спец Администратор';
+const EDIT_MIN_POSITION = 'Куратор Администрации';
+
+const AVAILABLE_PREFIXES = [
+  { id: 'vacation', label: 'Отпуск', css: 'vacation', icon: '🏖' },
+  { id: 'good', label: 'Хороший сотрудник', css: 'good', icon: '⭐' },
+  { id: 'bad', label: 'Плохой сотрудник', css: 'bad', icon: '⛔' },
+  { id: 'trial', label: 'Испытательный срок', css: 'trial', icon: '⏳' },
+];
+
+const MAX_LOGS = 500;
+const MAX_NOTIFICATIONS = 100;
+
+let admins = [], archive = [], bans = [], logs = [], invites = [];
+let currentUser = null;
+let pendingDeleteId = null, pendingEditId = null, pendingUnbanId = null;
+let pendingPrefixId = null, pendingNotesId = null;
+let pendingCounterId = null, pendingCounterType = null;
+let pendingDeleteAccId = null, pendingEditUserId = null;
+let pendingDeleteUserId = null;
+let isSaving = false, registerData = null;
+let isCloudLoaded = false;
+
+/* ============================================================
+   УТИЛИТЫ
+   ============================================================ */
+function isOwnerRole(role) { return OWNER_ROLES.includes(role); }
+function getRank(position) {
+  const idx = HIERARCHY.indexOf(position);
+  return idx === -1 ? 0 : HIERARCHY.length - idx;
+}
+function sortByHierarchy(arr) {
+  return [...arr].sort((a, b) => {
+    const ra = getRank(a.position), rb = getRank(b.position);
+    if (ra !== rb) return rb - ra;
+    const da = a.date ? new Date(a.date).getTime() : 0;
+    const db = b.date ? new Date(b.date).getTime() : 0;
+    if (da !== db) return da - db;
+    return (a.nick || '').localeCompare(b.nick || '');
+  });
+}
+function formatDate(d) {
+  if (!d) return '—';
+  const [y, m, day] = d.split('-');
+  return `${day}.${m}.${y}`;
+}
+function formatDateTime(iso) {
+  if (!iso) return '—';
+  const dt = new Date(iso);
+  const d = String(dt.getDate()).padStart(2, '0');
+  const m = String(dt.getMonth() + 1).padStart(2, '0');
+  const y = dt.getFullYear();
+  const h = String(dt.getHours()).padStart(2, '0');
+  const min = String(dt.getMinutes()).padStart(2, '0');
+  return `${d}.${m}.${y} ${h}:${min}`;
+}
+function formatTimeAgo(iso) {
+  if (!iso) return '';
+  const dt = new Date(iso);
+  const now = new Date();
+  const diff = Math.floor((now - dt) / 1000);
+  if (diff < 60) return 'только что';
+  if (diff < 3600) return Math.floor(diff / 60) + ' мин назад';
+  if (diff < 86400) return Math.floor(diff / 3600) + ' ч назад';
+  if (diff < 604800) return Math.floor(diff / 86400) + ' дн назад';
+  return formatDateTime(iso);
+}
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+}
+function escapeAttr(s) { return String(s).replace(/"/g, '&quot;'); }
+
+function showStatus(text, type = '', duration = 4000) {
+  const el = document.getElementById('status');
+  el.textContent = text;
+  el.className = 'status show ' + type;
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), duration);
+}
+
+function setConnectionStatus(state, text) {
+  const el = document.getElementById('connectionStatus');
+  const txt = document.getElementById('connectionText');
+  el.classList.remove('ok', 'err');
+  if (state === 'ok') el.classList.add('ok');
+  if (state === 'err') el.classList.add('err');
+  txt.textContent = text;
+}
+
+/* ============================================================
+   НОРМАЛИЗАЦИЯ ВК
+   ============================================================ */
+function normalizeVk(url) {
+  if (!url) return '';
+  let s = String(url).trim().toLowerCase();
+  s = s.replace(/^https?:\/\//, '');
+  s = s.replace(/^www\./, '');
+  s = s.replace(/^m\./, '');
+  s = s.replace(/^(vk\.com|vk\.ru|vkontakte\.ru)/, 'vk.com');
+  s = s.replace(/\/+$/, '');
+  s = s.split('?')[0];
+  s = s.split('#')[0];
+  return s;
+}
+function extractVkIdentifier(url) {
+  const norm = normalizeVk(url);
+  if (!norm) return '';
+  const parts = norm.split('/');
+  if (parts.length < 2) return '';
+  return parts[1] || '';
+}
+function findBanByVk(vkUrl) {
+  if (!vkUrl) return null;
+  const newVkId = extractVkIdentifier(vkUrl);
+  const newVkNorm = normalizeVk(vkUrl);
+  return bans.find(b => {
+    if (!b.vk) return false;
+    const bVkId = extractVkIdentifier(b.vk);
+    const bVkNorm = normalizeVk(b.vk);
+    if (newVkId && bVkId && newVkId === bVkId) return true;
+    if (newVkNorm && bVkNorm && newVkNorm === bVkNorm) return true;
+    return false;
+  }) || null;
+}
+
+/* ============================================================
+   ПРАВА
+   ============================================================ */
+function isMe(a) {
+  if (!currentUser) return false;
+  return currentUser.nick.toLowerCase() === (a.nick || '').toLowerCase();
+}
+function canAddAdmins() {
+  if (!currentUser) return false;
+  if (currentUser.isOwner) return true;
+  return getRank(currentUser.position) >= getRank(ADD_MIN_POSITION);
+}
+function canAddAdminsMessage() {
+  if (!currentUser) return 'Не выполнен вход';
+  if (currentUser.isOwner) return '';
+  if (getRank(currentUser.position) < getRank(ADD_MIN_POSITION))
+    return `Добавлять администраторов может только ${ADD_MIN_POSITION} и выше`;
+  return '';
+}
+function canEditUsers() {
+  if (!currentUser) return false;
+  if (currentUser.isOwner) return true;
+  return getRank(currentUser.position) >= getRank(EDIT_MIN_POSITION);
+}
+function canAssignPosition(position) {
+  if (!currentUser) return false;
+  if (currentUser.isOwner) return true;
+  return getRank(position) < getRank(currentUser.position);
+}
+function canManage(t) {
+  if (!currentUser) return false;
+  if (currentUser.nick.toLowerCase() === (t.nick || '').toLowerCase()) return false;
+  if (currentUser.isOwner) return true;
+  if (isOwnerRole(t.position)) return false;
+  return getRank(currentUser.position) > getRank(t.position);
+}
+function canManageMessage(t) {
+  if (!currentUser) return 'Не выполнен вход';
+  if (currentUser.nick.toLowerCase() === (t.nick || '').toLowerCase()) return 'Нельзя управлять самим собой';
+  if (currentUser.isOwner) return '';
+  if (isOwnerRole(t.position)) return 'Обычные администраторы не могут управлять владельцами';
+  if (getRank(currentUser.position) <= getRank(t.position)) return 'Нельзя управлять теми, кто равен или выше вас';
+  return '';
+}
+function canEditTarget(t) {
+  if (!currentUser) return false;
+  if (currentUser.nick.toLowerCase() === (t.nick || '').toLowerCase()) return false;
+  if (currentUser.isOwner) return true;
+  if (isOwnerRole(t.position)) return false;
+  if (!canEditUsers()) return false;
+  return getRank(currentUser.position) > getRank(t.position);
+}
+function canEditTargetMessage(t) {
+  if (!currentUser) return 'Не выполнен вход';
+  if (currentUser.nick.toLowerCase() === (t.nick || '').toLowerCase()) return 'Нельзя редактировать самого себя';
+  if (currentUser.isOwner) return '';
+  if (isOwnerRole(t.position)) return 'Обычные администраторы не могут управлять владельцами';
+  if (!canEditUsers()) return `Редактировать может только ${EDIT_MIN_POSITION} и выше`;
+  if (getRank(currentUser.position) <= getRank(t.position)) return 'Нельзя редактировать тех, кто равен или выше вас';
+  return '';
+}
+
+/* ============================================================
+   ГЕНЕРАЦИЯ КЛЮЧА
+   ============================================================ */
+function generateKey() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const seg = (n) => {
+    let s = '';
+    for (let i = 0; i < n; i++) s += chars[Math.floor(Math.random() * chars.length)];
+    return s;
+  };
+  return `${seg(3)}-${seg(3)}-${seg(3)}`;
+}
+
+/* ============================================================
+   УВЕДОМЛЕНИЯ — СОЗДАНИЕ
+   ============================================================ */
+async function addNotification(targetNick, type, html) {
+  const notif = {
+    id: 'n_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+    type, html,
+    at: new Date().toISOString(),
+    read: false
+  };
+
+  const admin = admins.find(a => a && a.nick && a.nick.toLowerCase() === targetNick.toLowerCase());
+  if (admin) {
+    const list = Array.isArray(admin.notifications) ? admin.notifications : [];
+    list.unshift(notif);
+    admin.notifications = list.slice(0, MAX_NOTIFICATIONS);
+    try {
+      await supabaseClient.from('admins').update({ notifications: admin.notifications }).eq('id', admin.id);
+    } catch(e) { console.warn('Не удалось сохранить уведомление:', e); }
+  }
+
+  const acc = invites.find(i => i && i.nick && i.nick.toLowerCase() === targetNick.toLowerCase() && i.used);
+  if (acc) {
+    const notif2 = { ...notif, id: 'n2_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6) };
+    const list2 = Array.isArray(acc.notifications) ? acc.notifications : [];
+    list2.unshift(notif2);
+    acc.notifications = list2.slice(0, MAX_NOTIFICATIONS);
+    try {
+      await supabaseClient.from('invites').update({ notifications: acc.notifications }).eq('id', acc.id);
+    } catch(e) { console.warn('Не удалось сохранить уведомление (аккаунт):', e); }
+  }
+}
+
+function getMyNotifications() {
+  if (!currentUser) return [];
+  if (currentUser.isOwner) return [];
+
+  const adminRec = admins.find(a => a && a.nick && a.nick.toLowerCase() === currentUser.nick.toLowerCase());
+  const adminNotifs = adminRec && Array.isArray(adminRec.notifications) ? adminRec.notifications : [];
+
+  const accRec = invites.find(a => a && a.nick && a.nick.toLowerCase() === currentUser.nick.toLowerCase());
+  const accNotifs = accRec && Array.isArray(accRec.notifications) ? accRec.notifications : [];
+
+  const all = [...adminNotifs, ...accNotifs];
+  const seen = new Set();
+  const unique = all.filter(n => {
+    const key = n.type + '|' + n.html + '|' + n.at;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  unique.sort((a, b) => new Date(b.at) - new Date(a.at));
+  return unique;
+}
+
+function getUnreadCount() {
+  return getMyNotifications().filter(n => !n.read).length;
+}
+
+async function markNotificationRead(id) {
+  const admin = admins.find(a => a && a.nick && a.nick.toLowerCase() === currentUser.nick.toLowerCase());
+  if (admin && Array.isArray(admin.notifications)) {
+    const n = admin.notifications.find(x => x.id === id);
+    if (n) n.read = true;
+    try { await supabaseClient.from('admins').update({ notifications: admin.notifications }).eq('id', admin.id); } catch(e) {}
+  }
+  const acc = invites.find(a => a && a.nick && a.nick.toLowerCase() === currentUser.nick.toLowerCase());
+  if (acc && Array.isArray(acc.notifications)) {
+    const n = acc.notifications.find(x => x.id === id);
+    if (n) n.read = true;
+    try { await supabaseClient.from('invites').update({ notifications: acc.notifications }).eq('id', acc.id); } catch(e) {}
+  }
+  renderNotifications();
+  updateBell();
+}
+
+async function markAllNotificationsRead() {
+  const admin = admins.find(a => a && a.nick && a.nick.toLowerCase() === currentUser.nick.toLowerCase());
+  if (admin && Array.isArray(admin.notifications)) {
+    admin.notifications.forEach(n => n.read = true);
+    try { await supabaseClient.from('admins').update({ notifications: admin.notifications }).eq('id', admin.id); } catch(e) {}
+  }
+  const acc = invites.find(a => a && a.nick && a.nick.toLowerCase() === currentUser.nick.toLowerCase());
+  if (acc && Array.isArray(acc.notifications)) {
+    acc.notifications.forEach(n => n.read = true);
+    try { await supabaseClient.from('invites').update({ notifications: acc.notifications }).eq('id', acc.id); } catch(e) {}
+  }
+  showStatus('✅ Все уведомления прочитаны', 'ok');
+  renderNotifications();
+  updateBell();
+}
+
+async function clearMyNotifications() {
+  if (!confirm('Очистить все уведомления?')) return;
+  const admin = admins.find(a => a && a.nick && a.nick.toLowerCase() === currentUser.nick.toLowerCase());
+  if (admin) {
+    admin.notifications = [];
+    try { await supabaseClient.from('admins').update({ notifications: [] }).eq('id', admin.id); } catch(e) {}
+  }
+  const acc = invites.find(a => a && a.nick && a.nick.toLowerCase() === currentUser.nick.toLowerCase());
+  if (acc) {
+    acc.notifications = [];
+    try { await supabaseClient.from('invites').update({ notifications: [] }).eq('id', acc.id); } catch(e) {}
+  }
+  showStatus('✅ Уведомления очищены', 'ok');
+  renderNotifications();
+  updateBell();
+}
+
+/* ============================================================
+   ДОСТИЖЕНИЯ
+   ============================================================ */
+function getAchievements(a) {
+  const result = [];
+  if (a.warnings === 0 && a.date) {
+    const days = Math.floor((new Date() - new Date(a.date)) / (1000 * 60 * 60 * 24));
+    if (days >= 30) result.push({ icon: '🛡', label: 'Идеальный 30 дней', css: 'badge-green' });
+  }
+  if (a.points >= 100) result.push({ icon: '💎', label: '100+ баллов', css: '' });
+  else if (a.points >= 50) result.push({ icon: '⭐', label: '50+ баллов', css: 'badge-blue' });
+  if (a.date) {
+    const days = Math.floor((new Date() - new Date(a.date)) / (1000 * 60 * 60 * 24));
+    if (days >= 365) result.push({ icon: '👑', label: 'Ветеран', css: '' });
+    else if (days >= 180) result.push({ icon: '🏅', label: 'Полгода на посту', css: 'badge-purple' });
+    else if (days >= 90) result.push({ icon: '📅', label: '3 месяца', css: 'badge-blue' });
+  }
+  if (a.points - a.warnings * 10 >= 50) result.push({ icon: '🔥', label: 'Топ сотрудник', css: '' });
+  return result;
+}
+
+/* ============================================================
+   АВТОРИЗАЦИЯ
+   ============================================================ */
+function openLogin() {
+  document.getElementById('loginNick').value = '';
+  document.getElementById('loginPassword').value = '';
+  document.getElementById('loginModal').classList.add('show');
+  setTimeout(() => document.getElementById('loginNick').focus(), 200);
+}
+function closeLogin() { document.getElementById('loginModal').classList.remove('show'); }
+
+function submitLogin() {
+  const nick = document.getElementById('loginNick').value.trim();
+  const pass = document.getElementById('loginPassword').value;
+  if (!nick || !pass) { showStatus('❌ Заполните ник и пароль', 'err'); return; }
+
+  if (nick.toLowerCase() === OWNER_NICK.toLowerCase()) {
+    if (pass === OWNER_PASSWORD) {
+      currentUser = { nick: OWNER_NICK, position: 'Администратор', isOwner: true };
+      sessionStorage.setItem('currentUser', JSON.stringify(currentUser));
+      closeLogin();
+      updateAuthUI();
+      showStatus('✅ Вход как Администратор', 'ok');
+      return;
+    } else {
+      showStatus('❌ Неверный пароль Администратора', 'err');
+      return;
+    }
+  }
+
+  const acc = invites.find(a => a.nick.toLowerCase() === nick.toLowerCase() && a.used && a.password);
+  if (!acc) { showStatus('❌ Аккаунт не найден или ещё не активирован', 'err'); return; }
+  if (acc.password !== pass) { showStatus('❌ Неверный пароль', 'err'); return; }
+
+  const isOwnerAcc = isOwnerRole(acc.position);
+  currentUser = { nick: acc.nick, position: acc.position, isOwner: isOwnerAcc };
+  sessionStorage.setItem('currentUser', JSON.stringify(currentUser));
+  closeLogin();
+  updateAuthUI();
+  showStatus(`✅ Вход: ${acc.nick} (${acc.position})`, 'ok');
+}
+
+function logout() {
+  currentUser = null;
+  sessionStorage.removeItem('currentUser');
+  updateAuthUI();
+  switchTab('dashboard');
+  showStatus('🔒 Вы вышли', '');
+}
+
+function updateAuthUI() {
+  const status = document.getElementById('authStatus');
+  const loginBtn = document.getElementById('loginBtn');
+  const logoutBtn = document.getElementById('logoutBtn');
+  const bellBtn = document.getElementById('bellBtn');
+  const container = document.querySelector('.container');
+  const accountsTab = document.getElementById('tab-accounts');
+  const usersTab = document.getElementById('tab-users');
+  const notifTab = document.getElementById('tab-notifications');
+  const addAdminFormBox = document.getElementById('addAdminFormBox');
+  const addBanFormBox = document.getElementById('addBanFormBox');
+  const addInviteFormBox = document.getElementById('addInviteFormBox');
+
+  if (currentUser) {
+    status.textContent = currentUser.isOwner
+      ? `👑 ${currentUser.nick} (${currentUser.position})`
+      : `✅ ${currentUser.nick} (${currentUser.position})`;
+    status.classList.add('logged');
+    status.classList.toggle('owner', currentUser.isOwner);
+    loginBtn.style.display = 'none';
+    logoutBtn.style.display = 'inline-block';
+    container.classList.remove('locked');
+
+    if (currentUser.isOwner) {
+      notifTab.classList.add('hidden');
+      bellBtn.style.display = 'none';
+    } else {
+      notifTab.classList.remove('hidden');
+      bellBtn.style.display = 'inline-block';
+    }
+
+    if (canAddAdmins()) accountsTab.classList.remove('hidden');
+    else { accountsTab.classList.add('hidden'); if (accountsTab.classList.contains('active')) switchTab('admins'); }
+
+    if (currentUser.isOwner) usersTab.classList.remove('hidden');
+    else { usersTab.classList.add('hidden'); if (usersTab.classList.contains('active')) switchTab('admins'); }
+
+    addAdminFormBox.hidden = !canAddAdmins();
+    addInviteFormBox.hidden = !canAddAdmins();
+    addBanFormBox.hidden = !currentUser.isOwner;
+
+    updateAddFormHint();
+    updateAccFormHint();
+    updateBell();
+  } else {
+    status.textContent = '🔒 Только просмотр';
+    status.classList.remove('logged', 'owner');
+    loginBtn.style.display = 'inline-block';
+    logoutBtn.style.display = 'none';
+    bellBtn.style.display = 'none';
+    container.classList.add('locked');
+    accountsTab.classList.add('hidden');
+    usersTab.classList.add('hidden');
+    notifTab.classList.add('hidden');
+    addAdminFormBox.hidden = true;
+    addBanFormBox.hidden = true;
+    addInviteFormBox.hidden = true;
+    if (accountsTab.classList.contains('active')) switchTab('dashboard');
+    if (usersTab.classList.contains('active')) switchTab('dashboard');
+    if (notifTab.classList.contains('active')) switchTab('dashboard');
+  }
+  updateBadges();
+  renderDashboard();
+  renderNotifications();
+}
+
+function updateBell() {
+  const count = getUnreadCount();
+  const el = document.getElementById('bellCount');
+  const badge = document.getElementById('badge-notifications');
+  if (count > 0) {
+    el.textContent = count;
+    el.style.display = 'inline-block';
+    badge.textContent = count;
+  } else {
+    el.style.display = 'none';
+    badge.textContent = '0';
+  }
+}
+
+function updateAddFormHint() {
+  const hint = document.getElementById('addPositionHint');
+  if (!hint || !currentUser) { if (hint) hint.textContent = ''; return; }
+  if (currentUser.isOwner) hint.textContent = 'Вы владелец — можете назначить любую должность.';
+  else {
+    const myRank = getRank(currentUser.position);
+    const available = HIERARCHY.filter(p => getRank(p) < myRank);
+    hint.textContent = available.length
+      ? `Только должности ниже вашей: от ${available[0]} до ${available[available.length-1]}`
+      : 'Нет доступных должностей';
+  }
+}
+function updateAccFormHint() {
+  const hint = document.getElementById('accPositionHint');
+  if (!hint || !currentUser) { if (hint) hint.textContent = ''; return; }
+  if (currentUser.isOwner) hint.textContent = 'Вы владелец — можете назначить любую должность.';
+  else {
+    const myRank = getRank(currentUser.position);
+    const available = HIERARCHY.filter(p => getRank(p) < myRank);
+    hint.textContent = available.length
+      ? `Только должности ниже вашей: от ${available[0]} до ${available[available.length-1]}`
+      : 'Нет доступных должностей';
+  }
+}
+
+/* ============================================================
+   ЗАГРУЗКА ИЗ SUPABASE
+   ============================================================ */
+async function loadFromCloud(silent = false) {
+  if (!silent) setConnectionStatus('loading', 'Соединение...');
+
+  try {
+    const [rAdmins, rArchive, rBans, rLogs, rInvites] = await Promise.all([
+      supabaseClient.from('admins').select('*'),
+      supabaseClient.from('archive').select('*'),
+      supabaseClient.from('bans').select('*'),
+      supabaseClient.from('logs').select('*').order('at', { ascending: false }).limit(MAX_LOGS),
+      supabaseClient.from('invites').select('*')
+    ]);
+
+    if (rAdmins.error) throw rAdmins.error;
+    if (rArchive.error) throw rArchive.error;
+    if (rBans.error) throw rBans.error;
+    if (rLogs.error) throw rLogs.error;
+    if (rInvites.error) throw rInvites.error;
+
+    admins = rAdmins.data || [];
+    archive = rArchive.data || [];
+    bans = rBans.data || [];
+    logs = rLogs.data || [];
+    invites = rInvites.data || [];
+
+    admins = sortByHierarchy(admins);
+    archive = sortByHierarchy(archive);
+
+    isCloudLoaded = true;
+    renderAll();
+    updateBell();
+    setConnectionStatus('ok', '✓ Подключено');
+    return true;
+  } catch (e) {
+    console.error('Ошибка загрузки:', e);
+    setConnectionStatus('err', '✕ Нет соединения');
+    if (!silent) showStatus('❌ Не удалось загрузить данные: ' + (e.message || ''), 'err', 6000);
+    return false;
+  }
+}
+
+async function refreshData() {
+  showStatus('🔄 Обновляем данные...', '', 2000);
+  await loadFromCloud();
+}
+
+/* ============================================================
+   СОХРАНЕНИЕ
+   ============================================================ */
+async function saveAdmin(a) {
+  const { error } = await supabaseClient.from('admins').upsert(a);
+  if (error) throw error;
+}
+async function saveBan(b) {
+  const { error } = await supabaseClient.from('bans').upsert(b);
+  if (error) throw error;
+}
+async function deleteBanFromDB(id) {
+  const { error } = await supabaseClient.from('bans').delete().eq('id', id);
+  if (error) throw error;
+}
+async function saveInvite(i) {
+  const { error } = await supabaseClient.from('invites').upsert(i);
+  if (error) throw error;
+}
+async function deleteInviteFromDB(id) {
+  const { error } = await supabaseClient.from('invites').delete().eq('id', id);
+  if (error) throw error;
+}
+async function saveLogItem(l) {
+  const { error } = await supabaseClient.from('logs').insert(l);
+  if (error) throw error;
+}
+
+/* ============================================================
+   ЛОГИ
+   ============================================================ */
+async function addLog(type, html) {
+  const log = {
+    id: 'l_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+    type, html,
+    at: new Date().toISOString()
+  };
+  logs.unshift(log);
+  if (logs.length > MAX_LOGS) logs = logs.slice(0, MAX_LOGS);
+  try { await saveLogItem(log); } catch (e) { console.warn('Лог не сохранился:', e); }
+}
+
+async function clearLogs() {
+  if (!confirm('Очистить все логи?')) return;
+  const backup = [...logs];
+  logs = [];
+  renderAll();
+  try {
+    const { error } = await supabaseClient.from('logs').delete().neq('id', '');
+    if (error) throw error;
+  } catch (e) {
+    logs = backup;
+    renderAll();
+    showStatus('❌ Не удалось очистить логи', 'err');
+  }
+}
+
+/* ============================================================
+   КАСТОМНЫЙ SELECT
+   ============================================================ */
+function fillSelectOptions(optionsEl, allowAny = false) {
+  optionsEl.innerHTML = HIERARCHY.map(p =>
+    `<div class="custom-select-option" data-value="${escapeAttr(p)}">${escapeHtml(p)}</div>`
+  ).join('');
+  optionsEl.querySelectorAll('.custom-select-option').forEach(opt => {
+    opt.addEventListener('click', () => {
+      const selectEl = optionsEl.closest('.custom-select');
+      const value = opt.dataset.value;
+      if (!allowAny && !canAssignPosition(value)) {
+        showStatus('❌ Нельзя назначить эту должность — она равна или выше вашей', 'err');
+        return;
+      }
+      selectEl.querySelectorAll('.custom-select-option').forEach(o => o.classList.remove('selected'));
+      opt.classList.add('selected');
+      selectEl.querySelector('.custom-select-value').textContent = value;
+      selectEl.classList.remove('open');
+    });
+  });
+}
+function setupCustomSelect(selectEl) {
+  const trigger = selectEl.querySelector('.custom-select-trigger');
+  const valueSpan = selectEl.querySelector('.custom-select-value');
+  const optionsEl = selectEl.querySelector('.custom-select-options');
+  trigger.addEventListener('click', (e) => {
+    e.stopPropagation();
+    document.querySelectorAll('.custom-select.open').forEach(s => {
+      if (s !== selectEl) s.classList.remove('open');
+    });
+    selectEl.classList.toggle('open');
+  });
+  return { valueSpan, optionsEl };
+}
+const mainSelect = document.getElementById('positionSelect');
+const mainSelectRef = setupCustomSelect(mainSelect);
+fillSelectOptions(mainSelectRef.optionsEl);
+mainSelectRef.valueSpan.textContent = 'Модератор';
+
+const editSelect = document.getElementById('editPositionSelect');
+const editSelectRef = setupCustomSelect(editSelect);
+fillSelectOptions(editSelectRef.optionsEl);
+
+const accSelect = document.getElementById('accPositionSelect');
+const accSelectRef = setupCustomSelect(accSelect);
+fillSelectOptions(accSelectRef.optionsEl);
+accSelectRef.valueSpan.textContent = 'Модератор';
+
+const editUserRoleSelect = document.getElementById('editUserRoleSelect');
+const editUserRoleRef = setupCustomSelect(editUserRoleSelect);
+fillSelectOptions(editUserRoleRef.optionsEl, true);
+editUserRoleRef.valueSpan.textContent = 'Модератор';
+
+document.addEventListener('click', () => {
+  document.querySelectorAll('.custom-select.open').forEach(s => s.classList.remove('open'));
+});
+
+function setSelectValue(selectEl, value) {
+  const valueSpan = selectEl.querySelector('.custom-select-value');
+  const options = selectEl.querySelectorAll('.custom-select-option');
+  valueSpan.textContent = value;
+  options.forEach(o => o.classList.toggle('selected', o.dataset.value === value));
+}
+
+/* ============================================================
+   ВКЛАДКИ
+   ============================================================ */
+function switchTab(tab) {
+  if (tab === 'accounts' && !canAddAdmins()) tab = 'dashboard';
+  if (tab === 'users' && (!currentUser || !currentUser.isOwner)) tab = 'dashboard';
+  if (tab === 'notifications' && (!currentUser || currentUser.isOwner)) tab = 'dashboard';
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  document.getElementById('view-' + tab).classList.add('active');
+  if (tab === 'notifications') renderNotifications();
+}
+function updateBadges() {
+  document.getElementById('badge-admins').textContent = admins.length;
+  document.getElementById('badge-archive').textContent = archive.length;
+  document.getElementById('badge-bans').textContent = bans.length;
+  document.getElementById('badge-logs').textContent = logs.length;
+  document.getElementById('badge-accounts').textContent = invites.length;
+  document.getElementById('badge-users').textContent = invites.filter(i => i.used).length;
+  updateBell();
+}
+function renderAll() {
+  updateBadges();
+  renderAdmins();
+  renderArchive();
+  renderBans();
+  renderLogs();
+  renderAccounts();
+  renderUsers();
+  renderDashboard();
+  renderNotifications();
+}
+
+/* ============================================================
+   ПРЕФИКСЫ
+   ============================================================ */
+function getAutoPrefixes(a) {
+  const result = [];
+  if (a.date) {
+    const start = new Date(a.date), now = new Date();
+    const diffDays = (now - start) / (1000 * 60 * 60 * 24);
+    if (diffDays >= 0 && diffDays < 7) result.push({ id: 'newbie', label: 'Новичок', css: 'newbie', icon: '🆕' });
+  }
+  return result;
+}
+function getManualPrefixes(a) {
+  const list = Array.isArray(a.prefixes) ? a.prefixes : [];
+  return list.map(id => {
+    const f = AVAILABLE_PREFIXES.find(p => p.id === id);
+    return f ? { ...f } : null;
+  }).filter(Boolean);
+}
+function getAllPrefixes(a) { return [...getAutoPrefixes(a), ...getManualPrefixes(a)]; }
+function renderPrefixesHTML(prefixes) {
+  if (!prefixes.length) return '';
+  return `<div class="prefixes">${prefixes.map(p => `
+    <span class="prefix ${p.css}">${p.icon || ''} ${escapeHtml(p.label)}</span>
+  `).join('')}</div>`;
+}
+function renderAchievementsHTML(a) {
+  const achievements = getAchievements(a);
+  if (!achievements.length) return '';
+  return `<div class="achievements">${achievements.map(ach => `
+    <span class="achievement ${ach.css}">${ach.icon} ${escapeHtml(ach.label)}</span>
+  `).join('')}</div>`;
+}
+
+/* ============================================================
+   ДОБАВЛЕНИЕ АДМИНА
+   ============================================================ */
+async function addAdmin() {
+  if (!canAddAdmins()) { showStatus('❌ ' + canAddAdminsMessage(), 'err'); return; }
+  const nick = document.getElementById('nick').value.trim();
+  const link = document.getElementById('link').value.trim();
+  const position = mainSelectRef.valueSpan.textContent;
+  const date = document.getElementById('date').value;
+  const notes = document.getElementById('notes').value.trim();
+  if (!nick) { alert('Введите ник администратора!'); return; }
+  if (!canAssignPosition(position)) { alert('Вы не можете назначить эту должность!'); return; }
+
+  if (link) {
+    const banned = findBanByVk(link);
+    if (banned) {
+      const period = banned.forever
+        ? 'навсегда'
+        : `с ${formatDate(banned.from_date) || '—'} по ${formatDate(banned.to_date) || '—'}`;
+      const confirmed = confirm(
+        `⛔ ЭТОТ ВК В ЧЁРНОМ СПИСКЕ!\n\n` +
+        `Ник в ЧС: ${banned.nick}\n` +
+        `ВК: ${banned.vk}\n` +
+        `Причина: ${banned.reason}\n` +
+        `Срок: ${period}\n\n` +
+        `Нельзя добавить администратора с этим ВК.\n\n` +
+        `Всё равно добавить?`
+      );
+      if (!confirmed) {
+        showStatus('❌ Админ с таким ВК находится в ЧС', 'err', 5000);
+        return;
+      }
+      await addLog('blocked',
+        `⚠ <b>${escapeHtml(currentUser.nick)}</b> добавил(а) админа <b>${escapeHtml(nick)}</b>, хотя его ВК в ЧС за «${escapeHtml(banned.reason)}»`
+      );
+    }
+  }
+
+  const newAdmin = {
+    id: 'a_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+    nick, link, position, date, notes: notes || '',
+    warnings: 0, points: 0, prefixes: [],
+    notifications: []
+  };
+
+  try {
+    await saveAdmin(newAdmin);
+    admins.push(newAdmin);
+    admins = sortByHierarchy(admins);
+    await addLog('created', `<b>${escapeHtml(currentUser.nick)}</b> добавил(а) <b>${escapeHtml(nick)}</b> на должность <b>${escapeHtml(position)}</b>`);
+    await addNotification(nick, 'created',
+      `<b>${escapeHtml(currentUser.nick)}</b> добавил(а) вас в администрацию на должность <b>${escapeHtml(position)}</b>`);
+
+    document.getElementById('nick').value = '';
+    document.getElementById('link').value = '';
+    document.getElementById('date').value = '';
+    document.getElementById('notes').value = '';
+    setSelectValue(mainSelect, 'Модератор');
+    renderAll();
+    showStatus('✅ Добавлено', 'ok');
+  } catch (e) {
+    console.error(e);
+    showStatus('❌ Не сохранилось: ' + e.message, 'err');
+  }
+}
+
+/* ============================================================
+   ПАНЕЛЬКА СЧЁТЧИКОВ
+   ============================================================ */
+function openCounter(id, type) {
+  const a = admins.find(x => x.id === id);
+  if (!a) return;
+  const permError = canManageMessage(a);
+  if (permError) { showStatus('❌ ' + permError, 'err'); return; }
+  pendingCounterId = id;
+  pendingCounterType = type;
+  const isPoints = type === 'points';
+  const title = document.getElementById('counterTitle');
+  const box = document.getElementById('counterModalBox');
+  const quickBox = document.getElementById('quickAmounts');
+  const hint = document.getElementById('counterHint');
+
+  if (isPoints) {
+    title.textContent = '💠 Изменить баллы';
+    title.style.color = '#42a5f5';
+    box.style.borderColor = '#42a5f5';
+    hint.textContent = 'Отрицательное число — отнимает баллы.';
+    quickBox.innerHTML = `
+      <button type="button" class="quick-amount" onclick="setAmount(1)">+1</button>
+      <button type="button" class="quick-amount" onclick="setAmount(5)">+5</button>
+      <button type="button" class="quick-amount" onclick="setAmount(10)">+10</button>
+      <button type="button" class="quick-amount neg" onclick="setAmount(-1)">−1</button>
+      <button type="button" class="quick-amount neg" onclick="setAmount(-5)">−5</button>
+      <button type="button" class="quick-amount neg" onclick="setAmount(-10)">−10</button>
+    `;
+  } else {
+    title.textContent = '⚠ Изменить выговоры';
+    title.style.color = '#ff7043';
+    box.style.borderColor = '#ff7043';
+    const remaining = Math.max(0, 3 - a.warnings);
+    hint.textContent = `Осталось добавить: ${remaining} (макс. 3). Отрицательное — снимает.`;
+    quickBox.innerHTML = `
+      <button type="button" class="quick-amount" onclick="setAmount(1)">+1 выговор</button>
+      <button type="button" class="quick-amount neg" onclick="setAmount(-1)">−1 выговор</button>
+    `;
+  }
+  document.getElementById('counterNick').textContent = a.nick;
+  document.getElementById('counterCurrent').textContent = isPoints ? `${a.points} балл(ов)` : `${a.warnings}/3 выговор(ов)`;
+  document.getElementById('counterAmount').value = '';
+  document.getElementById('counterReason').value = '';
+  updateCounterPreview();
+  document.getElementById('counterModal').classList.add('show');
+  setTimeout(() => document.getElementById('counterAmount').focus(), 200);
+}
+function setAmount(v) {
+  document.getElementById('counterAmount').value = v;
+  updateCounterPreview();
+}
+function updateCounterPreview() {
+  const amount = parseInt(document.getElementById('counterAmount').value);
+  const reason = document.getElementById('counterReason').value.trim();
+  const preview = document.getElementById('counterPreview');
+  const btn = document.getElementById('counterSubmitBtn');
+  const a = admins.find(x => x.id === pendingCounterId);
+  if (!a) { btn.disabled = true; return; }
+  if (isNaN(amount) || amount === 0) {
+    preview.className = 'amount-preview neutral';
+    preview.textContent = 'Введите количество и причину';
+    btn.disabled = true;
+    return;
+  }
+  if (pendingCounterType === 'warnings') {
+    const newVal = a.warnings + amount;
+    if (newVal > 3) {
+      preview.className = 'amount-preview blocked';
+      preview.textContent = `⚠ Нельзя больше 3 выговоров (станет ${newVal})`;
+      btn.disabled = true; return;
+    }
+    if (newVal < 0) {
+      preview.className = 'amount-preview blocked';
+      preview.textContent = `⚠ Нельзя уйти в минус (сейчас ${a.warnings}/3)`;
+      btn.disabled = true; return;
+    }
+  }
+  if (pendingCounterType === 'points') {
+    const newVal = a.points + amount;
+    if (newVal < 0) {
+      preview.className = 'amount-preview blocked';
+      preview.textContent = `⚠ Баллы не могут быть меньше 0 (сейчас ${a.points})`;
+      btn.disabled = true; return;
+    }
+  }
+  const sign = amount > 0 ? 'plus' : 'minus';
+  const word = amount > 0 ? '+' : '';
+  const typeName = pendingCounterType === 'points' ? 'балл(ов)' : 'выговор(ов)';
+  preview.className = 'amount-preview ' + sign;
+  preview.textContent = `${word}${amount} ${typeName}. Причина: ${reason || '— (обязательно)'}`;
+  btn.disabled = !(reason.length >= 3);
+}
+function closeCounter() {
+  document.getElementById('counterModal').classList.remove('show');
+  pendingCounterId = null;
+  pendingCounterType = null;
+}
+async function submitCounter() {
+  if (!pendingCounterId || !pendingCounterType) return;
+  const a = admins.find(x => x.id === pendingCounterId);
+  if (!a) return;
+  if (!canManage(a)) { showStatus('❌ ' + canManageMessage(a), 'err'); closeCounter(); return; }
+
+  const amount = parseInt(document.getElementById('counterAmount').value);
+  const reason = document.getElementById('counterReason').value.trim();
+  if (isNaN(amount) || amount === 0) { alert('Введите ненулевое количество!'); return; }
+  if (reason.length < 3) { alert('Укажите причину (минимум 3 символа)!'); return; }
+
+  const field = pendingCounterType;
+  const isPoints = field === 'points';
+  const oldValue = a[field];
+  const newValue = Math.max(0, oldValue + amount);
+  if (field === 'warnings' && newValue > 3) { alert('Нельзя больше 3 выговоров!'); return; }
+  if (newValue === oldValue) { alert('Значение не изменилось.'); return; }
+
+  const actualDelta = newValue - oldValue;
+  const updateData = {};
+  updateData[field] = newValue;
+
+  try {
+    const { error } = await supabaseClient.from('admins').update(updateData).eq('id', a.id);
+    if (error) throw error;
+    a[field] = newValue;
+    const sign = actualDelta > 0 ? '+' : '';
+    const className = actualDelta > 0 ? 'plus' : 'minus';
+
+    let notifText = '';
+    if (isPoints) {
+      await addLog('points', `<b>${escapeHtml(currentUser.nick)}</b> выдал(а) баллы <b>${escapeHtml(a.nick)}</b> — <span class="${className}">${sign}${actualDelta}</span> балл(ов), за <b>${escapeHtml(reason)}</b>`);
+      notifText = `<b>${escapeHtml(currentUser.nick)}</b> ${actualDelta > 0 ? 'выдал(а)' : 'снял(а)'} <span class="${className}">${sign}${actualDelta}</span> балл(ов)<br>Причина: <b>${escapeHtml(reason)}</b>`;
+      await addNotification(a.nick, 'points', notifText);
+    } else {
+      const word = Math.abs(actualDelta) === 1 ? 'выговор' : 'выговоров';
+      await addLog('warnings', `<b>${escapeHtml(currentUser.nick)}</b> выдал(а) <b>${escapeHtml(a.nick)}</b> — <span class="${className}">${sign}${actualDelta}</span> ${word}, за <b>${escapeHtml(reason)}</b>`);
+      notifText = `<b>${escapeHtml(currentUser.nick)}</b> ${actualDelta > 0 ? 'выдал(а)' : 'снял(а)'} <span class="${className}">${sign}${actualDelta}</span> ${word}<br>Причина: <b>${escapeHtml(reason)}</b>`;
+      await addNotification(a.nick, 'warnings', notifText);
+    }
+
+    closeCounter();
+    renderAll();
+    showStatus('✅ Применено', 'ok');
+  } catch (e) {
+    console.error(e);
+    showStatus('❌ Не сохранилось: ' + e.message, 'err');
+  }
+}
+
+async function quickDecrease(id, field) {
+  const a = admins.find(x => x.id === id);
+  if (!a) return;
+  if (!canManage(a)) { showStatus('❌ ' + canManageMessage(a), 'err'); return; }
+  if (a[field] <= 0) return;
+  const newValue = Math.max(0, a[field] - 1);
+  try {
+    const updateData = {};
+    updateData[field] = newValue;
+    const { error } = await supabaseClient.from('admins').update(updateData).eq('id', a.id);
+    if (error) throw error;
+    a[field] = newValue;
+    const isPoints = field === 'points';
+    if (isPoints) {
+      await addLog('points', `<b>${escapeHtml(currentUser.nick)}</b> снял(а) баллы <b>${escapeHtml(a.nick)}</b> — <span class="minus">−1</span> балл`);
+      await addNotification(a.nick, 'points', `<b>${escapeHtml(currentUser.nick)}</b> снял(а) <span class="minus">−1</span> балл`);
+    } else {
+      await addLog('warnings', `<b>${escapeHtml(currentUser.nick)}</b> снял(а) выговор <b>${escapeHtml(a.nick)}</b> — <span class="minus">−1</span> выговор`);
+      await addNotification(a.nick, 'warnings', `<b>${escapeHtml(currentUser.nick)}</b> снял(а) <span class="minus">−1</span> выговор`);
+    }
+    renderAll();
+  } catch (e) {
+    console.error(e);
+    showStatus('❌ Не сохранилось: ' + e.message, 'err');
+  }
+}
+
+/* ============================================================
+   РЕДАКТИРОВАНИЕ АДМИНА
+   ============================================================ */
+function editAdmin(id) {
+  const a = admins.find(x => x.id === id);
+  if (!a) return;
+  if (!canEditTarget(a)) { showStatus('❌ ' + canEditTargetMessage(a), 'err'); return; }
+  pendingEditId = id;
+  document.getElementById('editNick').value = a.nick;
+  document.getElementById('editLink').value = a.link || '';
+  document.getElementById('editNotes').value = a.notes || '';
+  document.getElementById('editDate').value = a.date || '';
+  setSelectValue(editSelect, a.position);
+  const hint = document.getElementById('editPositionHint');
+  if (currentUser.isOwner) hint.textContent = 'Вы владелец — можете назначить любую должность.';
+  else {
+    const myRank = getRank(currentUser.position);
+    const available = HIERARCHY.filter(p => getRank(p) < myRank);
+    hint.textContent = available.length
+      ? `Только должности ниже вашей: от ${available[0]} до ${available[available.length-1]}`
+      : 'Нет доступных должностей';
+  }
+  document.getElementById('editModal').classList.add('show');
+}
+function closeEdit() {
+  document.getElementById('editModal').classList.remove('show');
+  pendingEditId = null;
+}
+async function saveEdit() {
+  if (!pendingEditId) return;
+  const a = admins.find(x => x.id === pendingEditId);
+  if (!a) return;
+  if (!canEditTarget(a)) { showStatus('❌ ' + canEditTargetMessage(a), 'err'); closeEdit(); return; }
+  const newNick = document.getElementById('editNick').value.trim();
+  const newLink = document.getElementById('editLink').value.trim();
+  if (!newNick) { alert('Ник не может быть пустым!'); return; }
+
+  if (newLink && newLink !== (a.link || '')) {
+    const banned = findBanByVk(newLink);
+    if (banned) {
+      if (!confirm(`⛔ Этот ВК в ЧС за «${banned.reason}». Продолжить?`)) {
+        showStatus('❌ ВК находится в ЧС', 'err', 5000);
+        return;
+      }
+    }
+  }
+
+  const newPosition = editSelectRef.valueSpan.textContent;
+  const newDate = document.getElementById('editDate').value;
+  if (!currentUser.isOwner && !canAssignPosition(newPosition)) {
+    alert('Вы не можете назначить эту должность!'); return;
+  }
+  const oldNick = a.nick, oldPos = a.position, oldDate = a.date, oldLink = a.link;
+  const newNotes = document.getElementById('editNotes').value.trim();
+
+  try {
+    const { error } = await supabaseClient.from('admins').update({
+      nick: newNick, link: newLink, position: newPosition,
+      date: newDate || a.date, notes: newNotes
+    }).eq('id', a.id);
+    if (error) throw error;
+    a.nick = newNick; a.link = newLink; a.position = newPosition;
+    if (newDate) a.date = newDate; a.notes = newNotes;
+
+    const changes = [];
+    if (oldNick !== newNick) changes.push(`ник: <b>${escapeHtml(oldNick)}</b> → <b>${escapeHtml(newNick)}</b>`);
+    if (oldPos !== a.position) changes.push(`должность: <b>${escapeHtml(oldPos)}</b> → <b>${escapeHtml(a.position)}</b>`);
+    if (oldDate !== a.date) changes.push(`дата: <b>${formatDate(oldDate)}</b> → <b>${formatDate(a.date)}</b>`);
+    if (oldLink !== a.link) changes.push(`ВК: <b>${escapeHtml(oldLink || '—')}</b> → <b>${escapeHtml(a.link || '—')}</b>`);
+    if (changes.length) await addLog('points', `<b>${escapeHtml(currentUser.nick)}</b> изменил(а) <b>${escapeHtml(oldNick)}</b>: ${changes.join(', ')}`);
+
+    if (oldPos !== a.position) {
+      await addNotification(a.nick, 'role',
+        `<b>${escapeHtml(currentUser.nick)}</b> изменил(а) вашу должность:<br>«${escapeHtml(oldPos)}» → <b>${escapeHtml(a.position)}</b>`);
+    }
+
+    closeEdit();
+    renderAll();
+    showStatus('✅ Сохранено', 'ok');
+  } catch (e) {
+    console.error(e);
+    showStatus('❌ Не сохранилось: ' + e.message, 'err');
+  }
+}
+
+/* ============================================================
+   ПРИМЕЧАНИЯ
+   ============================================================ */
+function openNotes(id) {
+  const a = admins.find(x => x.id === id);
+  if (!a) return;
+  if (!canEditTarget(a)) { showStatus('❌ ' + canEditTargetMessage(a), 'err'); return; }
+  pendingNotesId = id;
+  document.getElementById('notesNick').textContent = a.nick;
+  document.getElementById('notesText').value = a.notes || '';
+  document.getElementById('notesModal').classList.add('show');
+}
+function closeNotes() {
+  document.getElementById('notesModal').classList.remove('show');
+  pendingNotesId = null;
+}
+async function saveNotes() {
+  if (!pendingNotesId) return;
+  const a = admins.find(x => x.id === pendingNotesId);
+  if (!a) return;
+  if (!canEditTarget(a)) { showStatus('❌ ' + canEditTargetMessage(a), 'err'); closeNotes(); return; }
+  const newNotes = document.getElementById('notesText').value.trim();
+  try {
+    const { error } = await supabaseClient.from('admins').update({ notes: newNotes }).eq('id', a.id);
+    if (error) throw error;
+    a.notes = newNotes;
+    await addLog('points', `<b>${escapeHtml(currentUser.nick)}</b> обновил(а) примечания <b>${escapeHtml(a.nick)}</b>`);
+    closeNotes();
+    renderAll();
+    showStatus('✅ Сохранено', 'ok');
+  } catch (e) {
+    console.error(e);
+    showStatus('❌ Не сохранилось: ' + e.message, 'err');
+  }
+}
+
+/* ============================================================
+   ПРЕФИКСЫ
+   ============================================================ */
+function openPrefix(id) {
+  const a = admins.find(x => x.id === id);
+  if (!a) return;
+  if (!canEditTarget(a)) { showStatus('❌ ' + canEditTargetMessage(a), 'err'); return; }
+  pendingPrefixId = id;
+  document.getElementById('prefixNick').textContent = a.nick;
+  renderPrefixPicker();
+  document.getElementById('prefixModal').classList.add('show');
+}
+function renderPrefixPicker() {
+  const a = admins.find(x => x.id === pendingPrefixId);
+  if (!a) return;
+  const current = Array.isArray(a.prefixes) ? a.prefixes : [];
+  const picker = document.getElementById('prefixPicker');
+  picker.innerHTML = AVAILABLE_PREFIXES.map(p => {
+    const active = current.includes(p.id);
+    return `<button type="button" class="quick-amount" style="${active ? 'border-color:#4fc3f7;color:#4fc3f7;background:#2c3e60;' : ''}" onclick="togglePrefix('${p.id}')">
+      ${p.icon} ${p.label}${active ? ' ✓' : ''}
+    </button>`;
+  }).join('');
+}
+async function togglePrefix(prefixId) {
+  if (!pendingPrefixId) return;
+  const a = admins.find(x => x.id === pendingPrefixId);
+  if (!a) return;
+  if (!canEditTarget(a)) { showStatus('❌ ' + canEditTargetMessage(a), 'err'); closePrefix(); return; }
+  if (!Array.isArray(a.prefixes)) a.prefixes = [];
+  const prefix = AVAILABLE_PREFIXES.find(p => p.id === prefixId);
+  const prefixLabel = prefix ? prefix.label : prefixId;
+  let newPrefixes;
+  let logMsg;
+  let notifMsg;
+  if (a.prefixes.includes(prefixId)) {
+    newPrefixes = a.prefixes.filter(p => p !== prefixId);
+    logMsg = `<b>${escapeHtml(currentUser.nick)}</b> убрал(а) префикс «${escapeHtml(prefixLabel)}» у <b>${escapeHtml(a.nick)}</b>`;
+    notifMsg = `<b>${escapeHtml(currentUser.nick)}</b> убрал(а) префикс «${escapeHtml(prefixLabel)}»`;
+  } else {
+    newPrefixes = [...a.prefixes, prefixId];
+    logMsg = `<b>${escapeHtml(currentUser.nick)}</b> выдал(а) префикс «${escapeHtml(prefixLabel)}» <b>${escapeHtml(a.nick)}</b>`;
+    notifMsg = `<b>${escapeHtml(currentUser.nick)}</b> выдал(а) вам префикс «${escapeHtml(prefixLabel)}»`;
+  }
+  try {
+    const { error } = await supabaseClient.from('admins').update({ prefixes: newPrefixes }).eq('id', a.id);
+    if (error) throw error;
+    a.prefixes = newPrefixes;
+    await addLog('points', logMsg);
+    await addNotification(a.nick, 'prefix', notifMsg);
+    renderPrefixPicker();
+    renderAll();
+  } catch (e) {
+    console.error(e);
+    showStatus('❌ Не сохранилось: ' + e.message, 'err');
+  }
+}
+function closePrefix() {
+  document.getElementById('prefixModal').classList.remove('show');
+  pendingPrefixId = null;
+}
+
+/* ============================================================
+   СНЯТИЕ
+   ============================================================ */
+function removeAdmin(id) {
+  const a = admins.find(x => x.id === id);
+  if (!a) return;
+  if (!canEditTarget(a)) { showStatus('❌ ' + canEditTargetMessage(a), 'err'); return; }
+  pendingDeleteId = id;
+  document.getElementById('modalNick').textContent = a.nick;
+  document.getElementById('removeReason').value = '';
+  document.getElementById('confirmRemoveBtn').disabled = true;
+  document.getElementById('confirmModal').classList.add('show');
+}
+function updateRemoveBtn() {
+  const reason = document.getElementById('removeReason').value.trim();
+  document.getElementById('confirmRemoveBtn').disabled = reason.length < 3;
+}
+function closeConfirm() {
+  document.getElementById('confirmModal').classList.remove('show');
+  pendingDeleteId = null;
+  document.getElementById('removeReason').value = '';
+  document.getElementById('confirmRemoveBtn').disabled = true;
+}
+async function confirmDelete() {
+  if (!pendingDeleteId) return;
+  const reason = document.getElementById('removeReason').value.trim();
+  if (reason.length < 3) { alert('Укажите причину (минимум 3 символа)!'); return; }
+  const removed = admins.find(x => x.id === pendingDeleteId);
+  if (!removed) return;
+  if (!canEditTarget(removed)) { showStatus('❌ ' + canEditTargetMessage(removed), 'err'); closeConfirm(); return; }
+
+  const archiveItem = {
+    id: removed.id, nick: removed.nick, link: removed.link || '',
+    position: removed.position, date: removed.date || '', notes: removed.notes || '',
+    warnings: removed.warnings || 0, points: removed.points || 0,
+    prefixes: removed.prefixes || [],
+    removed_at: new Date().toISOString(), reason
+  };
+
+  try {
+    const { error: e1 } = await supabaseClient.from('archive').insert(archiveItem);
+    if (e1) throw e1;
+    const { error: e2 } = await supabaseClient.from('admins').delete().eq('id', removed.id);
+    if (e2) throw e2;
+
+    archive.unshift(archiveItem);
+    admins = admins.filter(x => x.id !== pendingDeleteId);
+    await addLog('removed', `<b>${escapeHtml(currentUser.nick)}</b> снял(а) <b>${escapeHtml(removed.nick)}</b> с должности «${escapeHtml(removed.position)}», за <b>${escapeHtml(reason)}</b>`);
+
+    pendingDeleteId = null;
+    document.getElementById('confirmModal').classList.remove('show');
+    document.getElementById('removeReason').value = '';
+    document.getElementById('confirmRemoveBtn').disabled = true;
+    renderAll();
+    showStatus(`✅ ${removed.nick} в архиве`, 'ok');
+  } catch (e) {
+    console.error(e);
+    showStatus('❌ Не удалось снять: ' + e.message, 'err');
+  }
+}
+
+async function restoreFromArchive(id) {
+  if (!currentUser || !currentUser.isOwner) { showStatus('❌ Только владельцы могут восстанавливать', 'err'); return; }
+  const a = archive.find(x => x.id === id);
+  if (!a) return;
+  if (!confirm(`Восстановить ${a.nick}?`)) return;
+
+  if (a.link) {
+    const banned = findBanByVk(a.link);
+    if (banned) {
+      if (!confirm(`⛔ ВК этого админа в ЧС за «${banned.reason}».\n\nВсё равно восстановить?`)) return;
+    }
+  }
+
+  const restoreItem = {
+    id: a.id, nick: a.nick, link: a.link || '', position: a.position,
+    date: a.date || '', notes: a.notes || '',
+    warnings: a.warnings || 0, points: a.points || 0,
+    prefixes: a.prefixes || [],
+    notifications: []
+  };
+
+  try {
+    const { error: e1 } = await supabaseClient.from('admins').insert(restoreItem);
+    if (e1) throw e1;
+    const { error: e2 } = await supabaseClient.from('archive').delete().eq('id', a.id);
+    if (e2) throw e2;
+
+    admins.push(restoreItem);
+    admins = sortByHierarchy(admins);
+    archive = archive.filter(x => x.id !== id);
+    await addLog('restored', `<b>${escapeHtml(currentUser.nick)}</b> восстановил(а) <b>${escapeHtml(a.nick)}</b> на «${escapeHtml(a.position)}»`);
+
+    renderAll();
+    showStatus(`✅ ${a.nick} восстановлен`, 'ok');
+  } catch (e) {
+    console.error(e);
+    showStatus('❌ Не удалось: ' + e.message, 'err');
+  }
+}
+
+/* ============================================================
+   ЧС
+   ============================================================ */
+function toggleForever() {
+  const forever = document.getElementById('banForever').checked;
+  const toInput = document.getElementById('banTo');
+  toInput.disabled = forever;
+  if (forever) toInput.value = '';
+}
+async function addBan() {
+  if (!currentUser || !currentUser.isOwner) { showStatus('❌ Только владельцы', 'err'); return; }
+  const vk = document.getElementById('banVk').value.trim();
+  const nick = document.getElementById('banNick').value.trim();
+  const reason = document.getElementById('banReason').value.trim();
+  const fromDate = document.getElementById('banFrom').value;
+  const forever = document.getElementById('banForever').checked;
+  const toDate = forever ? '' : document.getElementById('banTo').value;
+  if (!vk) { alert('Укажите ссылку ВК!'); return; }
+  if (!nick) { alert('Укажите ник!'); return; }
+  if (!reason) { alert('Укажите причину!'); return; }
+
+  const newBan = {
+    id: 'b_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+    vk, nick, reason, from_date: fromDate || '', to_date: toDate || '',
+    forever, added_at: new Date().toISOString()
+  };
+
+  try {
+    await saveBan(newBan);
+    bans.unshift(newBan);
+    const period = forever ? 'навсегда' : `с ${fromDate || '—'} по ${toDate || '—'}`;
+    await addLog('ban', `<b>${escapeHtml(currentUser.nick)}</b> добавил(а) в ЧС <b>${escapeHtml(nick)}</b> (${period}), за <b>${escapeHtml(reason)}</b>`);
+
+    document.getElementById('banVk').value = '';
+    document.getElementById('banNick').value = '';
+    document.getElementById('banReason').value = '';
+    document.getElementById('banFrom').value = '';
+    document.getElementById('banTo').value = '';
+    document.getElementById('banForever').checked = false;
+    document.getElementById('banTo').disabled = false;
+    renderAll();
+    showStatus('✅ Добавлено в ЧС', 'ok');
+  } catch (e) {
+    console.error(e);
+    showStatus('❌ Не сохранилось: ' + e.message, 'err');
+  }
+}
+function unbanUser(id) {
+  if (!currentUser || !currentUser.isOwner) { showStatus('❌ Только владельцы', 'err'); return; }
+  const b = bans.find(x => x.id === id);
+  if (!b) return;
+  pendingUnbanId = id;
+  document.getElementById('unbanNick').textContent = b.nick;
+  document.getElementById('unbanModal').classList.add('show');
+}
+function closeUnban() {
+  document.getElementById('unbanModal').classList.remove('show');
+  pendingUnbanId = null;
+}
+async function confirmUnban() {
+  if (!pendingUnbanId) return;
+  const b = bans.find(x => x.id === pendingUnbanId);
+  if (!b) return;
+  try {
+    await deleteBanFromDB(b.id);
+    bans = bans.filter(x => x.id !== pendingUnbanId);
+    await addLog('unban', `<b>${escapeHtml(currentUser.nick)}</b> снял(а) с ЧС <b>${escapeHtml(b.nick)}</b>`);
+    pendingUnbanId = null;
+    document.getElementById('unbanModal').classList.remove('show');
+    renderAll();
+    showStatus('✅ Снято с ЧС', 'ok');
+  } catch (e) {
+    console.error(e);
+    showStatus('❌ Не удалось: ' + e.message, 'err');
+  }
+}
+
+/* ============================================================
+   ПРИГЛАШЕНИЯ
+   ============================================================ */
+async function addInvite() {
+  if (!canAddAdmins()) { showStatus('❌ ' + canAddAdminsMessage(), 'err'); return; }
+  const nick = document.getElementById('accNick').value.trim();
+  const position = accSelectRef.valueSpan.textContent;
+  if (!nick) { alert('Введите ник!'); return; }
+  if (nick.length < 3) { alert('Ник минимум 3 символа'); return; }
+  if (nick.toLowerCase() === OWNER_NICK.toLowerCase()) { alert('Ник занят!'); return; }
+
+  const nickLower = nick.toLowerCase();
+  const existingInvite = invites.find(a => a && a.nick && a.nick.toLowerCase() === nickLower);
+  if (existingInvite) {
+    if (existingInvite.used) alert('Аккаунт с таким ником уже зарегистрирован!');
+    else alert('Приглашение с таким ником уже создано!');
+    return;
+  }
+
+  const adminWithNick = admins.find(a => a && a.nick && a.nick.toLowerCase() === nickLower);
+  if (!adminWithNick) {
+    if (!confirm(`⚠ Админа «${nick}» нет в списке. Всё равно создать?`)) return;
+  }
+  if (!canAssignPosition(position)) { alert('Вы не можете назначить эту должность!'); return; }
+  if (adminWithNick && adminWithNick.position !== position) {
+    if (!confirm(`⚠ У админа «${nick}» должность «${adminWithNick.position}», а вы ставите «${position}». Продолжить?`)) return;
+  }
+  if (adminWithNick && adminWithNick.link) {
+    const banned = findBanByVk(adminWithNick.link);
+    if (banned) {
+      if (!confirm(`⛔ ВК этого админа в ЧС за «${banned.reason}».\n\nВсё равно выдать приглашение?`)) return;
+    }
+  }
+
+  const key = generateKey();
+  const newInvite = {
+    id: 'inv_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+    nick, position, key, used: false, password: null,
+    created_at: new Date().toISOString(), used_at: null,
+    notifications: []
+  };
+
+  try {
+    await saveInvite(newInvite);
+    invites.push(newInvite);
+    await addLog('account', `<b>${escapeHtml(currentUser.nick)}</b> создал(а) приглашение для <b>${escapeHtml(nick)}</b>, ключ <b>${escapeHtml(key)}</b>`);
+    document.getElementById('accNick').value = '';
+    setSelectValue(accSelect, 'Модератор');
+    renderAll();
+    showStatus(`✅ Ключ: ${key}`, 'ok', 6000);
+  } catch (e) {
+    console.error(e);
+    showStatus('❌ Не сохранилось: ' + e.message, 'err');
+  }
+}
+
+function deleteInvite(id) {
+  if (!canAddAdmins()) return;
+  const inv = invites.find(a => a.id === id);
+  if (!inv) return;
+  pendingDeleteAccId = id;
+  document.getElementById('deleteAccNick').textContent = inv.nick;
+  document.getElementById('deleteAccModal').classList.add('show');
+}
+function closeDeleteAcc() {
+  document.getElementById('deleteAccModal').classList.remove('show');
+  pendingDeleteAccId = null;
+}
+async function confirmDeleteAcc() {
+  if (!pendingDeleteAccId) return;
+  const inv = invites.find(a => a.id === pendingDeleteAccId);
+  if (!inv) return;
+  try {
+    await deleteInviteFromDB(inv.id);
+    invites = invites.filter(a => a.id !== pendingDeleteAccId);
+    await addLog('account', `<b>${escapeHtml(currentUser.nick)}</b> удалил(а) приглашение для <b>${escapeHtml(inv.nick)}</b>`);
+    pendingDeleteAccId = null;
+    document.getElementById('deleteAccModal').classList.remove('show');
+    renderAll();
+    showStatus('✅ Удалено', 'ok');
+  } catch (e) {
+    console.error(e);
+    showStatus('❌ Не удалось: ' + e.message, 'err');
+  }
+}
+
+function copyKey(key) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(key).then(() => showStatus('📋 Скопировано', 'ok')).catch(() => fallbackCopy(key));
+  } else fallbackCopy(key);
+}
+function fallbackCopy(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+  document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); showStatus('📋 Скопировано', 'ok'); }
+  catch (e) { showStatus('Скопируйте вручную: ' + text, 'err', 6000); }
+  document.body.removeChild(ta);
+}
+
+/* ============================================================
+   РЕГИСТРАЦИЯ
+   ============================================================ */
+function openRegister() {
+  closeLogin();
+  if (!isCloudLoaded) { showStatus('⏳ Данные ещё загружаются...', '', 3000); loadFromCloud(); return; }
+  registerData = null;
+  document.getElementById('regKey').value = '';
+  document.getElementById('registerModal').classList.add('show');
+  setTimeout(() => document.getElementById('regKey').focus(), 200);
+}
+function closeRegister() {
+  document.getElementById('registerModal').classList.remove('show');
+  document.getElementById('registerStep2Modal').classList.remove('show');
+  registerData = null;
+}
+async function checkInvite() {
+  const keyInput = document.getElementById('regKey');
+  const key = keyInput.value.trim().toUpperCase();
+  if (!key) { showStatus('❌ Введите ключ', 'err'); return; }
+  if (!isCloudLoaded) {
+    showStatus('⏳ Загружаем данные...', '', 2000);
+    const ok = await loadFromCloud(true);
+    if (!ok) { showStatus('❌ Не удалось загрузить данные', 'err', 5000); return; }
+  }
+  const normalized = key.replace(/\s+/g, '');
+  const inv = invites.find(i => (i.key || '').toUpperCase().replace(/\s+/g, '') === normalized);
+  if (!inv) { showStatus(`❌ Ключ «${key}» не найден`, 'err', 5000); return; }
+  if (inv.used) { showStatus('❌ Ключ уже использован', 'err'); return; }
+
+  registerData = { invId: inv.id, nick: inv.nick, position: inv.position };
+  document.getElementById('regNickPreview').textContent = inv.nick;
+  document.getElementById('regPositionPreview').textContent = inv.position;
+  document.getElementById('regPass1').value = '';
+  document.getElementById('regPass2').value = '';
+  document.getElementById('registerModal').classList.remove('show');
+  document.getElementById('registerStep2Modal').classList.add('show');
+  setTimeout(() => document.getElementById('regPass1').focus(), 200);
+}
+function backToStep1() {
+  document.getElementById('registerStep2Modal').classList.remove('show');
+  document.getElementById('registerModal').classList.add('show');
+}
+async function completeRegister() {
+  if (!registerData) return;
+  const p1 = document.getElementById('regPass1').value;
+  const p2 = document.getElementById('regPass2').value;
+  if (!p1 || !p2) { showStatus('❌ Заполните оба поля', 'err'); return; }
+  if (p1.length < 3) { showStatus('❌ Минимум 3 символа', 'err'); return; }
+  if (p1 !== p2) { showStatus('❌ Пароли не совпадают', 'err'); return; }
+
+  const inv = invites.find(i => i.id === registerData.invId);
+  if (!inv || inv.used) { showStatus('❌ Приглашение уже использовано', 'err'); return; }
+
+  try {
+    const { error } = await supabaseClient.from('invites').update({
+      used: true, password: p1, used_at: new Date().toISOString()
+    }).eq('id', inv.id);
+    if (error) throw error;
+
+    inv.used = true; inv.password = p1; inv.used_at = new Date().toISOString();
+    await addLog('account', `<b>${escapeHtml(inv.nick)}</b> зарегистрировался(ась) на <b>${escapeHtml(inv.position)}</b>`);
+    document.getElementById('registerStep2Modal').classList.remove('show');
+    registerData = null;
+    renderAll();
+    showStatus('✅ Регистрация завершена!', 'ok');
+    setTimeout(() => {
+      document.getElementById('loginNick').value = inv.nick;
+      document.getElementById('loginPassword').value = '';
+      document.getElementById('loginModal').classList.add('show');
+      setTimeout(() => document.getElementById('loginPassword').focus(), 200);
+    }, 500);
+  } catch (e) {
+    console.error(e);
+    showStatus('❌ Не удалось: ' + e.message, 'err');
+  }
+}
+
+/* ============================================================
+   УПРАВЛЕНИЕ АККАУНТАМИ
+   ============================================================ */
+function editUserRole(id) {
+  if (!currentUser || !currentUser.isOwner) { showStatus('❌ Только владелец', 'err'); return; }
+  const acc = invites.find(a => a.id === id);
+  if (!acc || !acc.used) { showStatus('❌ Аккаунт не найден', 'err'); return; }
+  pendingEditUserId = id;
+  document.getElementById('editUserRoleNick').textContent = acc.nick;
+  setSelectValue(editUserRoleSelect, acc.position);
+  document.getElementById('editUserRoleModal').classList.add('show');
+}
+function closeEditUserRole() {
+  document.getElementById('editUserRoleModal').classList.remove('show');
+  pendingEditUserId = null;
+}
+async function saveUserRole() {
+  if (!pendingEditUserId) return;
+  if (!currentUser || !currentUser.isOwner) { showStatus('❌ Нет прав', 'err'); closeEditUserRole(); return; }
+  const acc = invites.find(a => a.id === pendingEditUserId);
+  if (!acc) { closeEditUserRole(); return; }
+  const newRole = editUserRoleRef.valueSpan.textContent;
+  if (newRole === acc.position) { closeEditUserRole(); return; }
+  if (currentUser.nick.toLowerCase() === acc.nick.toLowerCase()) { alert('Нельзя менять роль себе!'); return; }
+
+  const oldRole = acc.position;
+  try {
+    const { error } = await supabaseClient.from('invites').update({ position: newRole }).eq('id', acc.id);
+    if (error) throw error;
+    acc.position = newRole;
+    await addLog('account', `<b>${escapeHtml(currentUser.nick)}</b> изменил(а) роль <b>${escapeHtml(acc.nick)}</b>: «${escapeHtml(oldRole)}» → «${escapeHtml(newRole)}»`);
+    await addNotification(acc.nick, 'role',
+      `<b>${escapeHtml(currentUser.nick)}</b> изменил(а) вашу роль:<br>«${escapeHtml(oldRole)}» → <b>${escapeHtml(newRole)}</b>`);
+    closeEditUserRole();
+    renderAll();
+    showStatus(`✅ Роль изменена на ${newRole}`, 'ok');
+  } catch (e) {
+    console.error(e);
+    showStatus('❌ Не удалось: ' + e.message, 'err');
+  }
+}
+
+function deleteUser(id) {
+  if (!currentUser || !currentUser.isOwner) { showStatus('❌ Только владелец', 'err'); return; }
+  const acc = invites.find(a => a.id === id);
+  if (!acc || !acc.used) { showStatus('❌ Не найден', 'err'); return; }
+  if (currentUser.nick.toLowerCase() === acc.nick.toLowerCase()) { alert('Нельзя удалить свой аккаунт!'); return; }
+  pendingDeleteUserId = id;
+  document.getElementById('deleteUserNick').textContent = acc.nick;
+  document.getElementById('deleteUserModal').classList.add('show');
+}
+function closeDeleteUser() {
+  document.getElementById('deleteUserModal').classList.remove('show');
+  pendingDeleteUserId = null;
+}
+async function confirmDeleteUser() {
+  if (!pendingDeleteUserId) return;
+  const acc = invites.find(a => a.id === pendingDeleteUserId);
+  if (!acc) { closeDeleteUser(); return; }
+  if (currentUser.nick.toLowerCase() === acc.nick.toLowerCase()) { alert('Нельзя удалить свой!'); closeDeleteUser(); return; }
+  try {
+    await deleteInviteFromDB(acc.id);
+    invites = invites.filter(i => i.id !== pendingDeleteUserId);
+    await addLog('account', `<b>${escapeHtml(currentUser.nick)}</b> удалил(а) аккаунт <b>${escapeHtml(acc.nick)}</b>`);
+    pendingDeleteUserId = null;
+    document.getElementById('deleteUserModal').classList.remove('show');
+    renderAll();
+    showStatus(`✅ ${acc.nick} удалён`, 'ok');
+  } catch (e) {
+    console.error(e);
+    showStatus('❌ Не удалось: ' + e.message, 'err');
+  }
+}
+
+/* ============================================================
+   ДАШБОРД
+   ============================================================ */
+function renderDashboard() {
+  const stats = document.getElementById('dashboardStats');
+  if (!stats) return;
+  const totalAdmins = admins.length;
+  const totalWarned = admins.filter(a => a.warnings >= 3).length;
+  const totalPoints = admins.reduce((s, a) => s + (a.points || 0), 0);
+  const totalWarnings = admins.reduce((s, a) => s + (a.warnings || 0), 0);
+  const registeredAccounts = invites.filter(i => i.used).length;
+  const activeInvites = invites.filter(i => !i.used).length;
+
+  stats.innerHTML = `
+    <div class="stat-card blue"><div class="stat-label">Всего админов</div><div class="stat-value">${totalAdmins}</div></div>
+    <div class="stat-card gold"><div class="stat-label">Аккаунтов</div><div class="stat-value">${registeredAccounts}</div><div class="stat-sub">Приглашений активно: ${activeInvites}</div></div>
+    <div class="stat-card green"><div class="stat-label">Всего баллов</div><div class="stat-value">${totalPoints}</div><div class="stat-sub">Среднее: ${totalAdmins ? (totalPoints / totalAdmins).toFixed(1) : 0}</div></div>
+    <div class="stat-card red"><div class="stat-label">Выговоров</div><div class="stat-value">${totalWarnings}</div><div class="stat-sub">С 3/3: ${totalWarned}</div></div>
+    <div class="stat-card purple"><div class="stat-label">В ЧС</div><div class="stat-value">${bans.length}</div><div class="stat-sub">В архиве: ${archive.length}</div></div>
+  `;
+
+  const topP = [...admins].sort((a, b) => (b.points || 0) - (a.points || 0)).slice(0, 5);
+  document.getElementById('topPoints').innerHTML = topP.length
+    ? topP.map((a, i) => `<div class="rank-item"><div class="rank-num ${i===0?'gold':i===1?'silver':i===2?'bronze':''}">#${i+1}</div><div class="rank-name">${escapeHtml(a.nick)}<div class="rank-pos">${escapeHtml(a.position)}</div></div><div class="rank-value">${a.points || 0} 💠</div></div>`).join('')
+    : '<div style="color:#667;padding:10px;text-align:center;">Пусто</div>';
+
+  const topW = [...admins].filter(a => a.warnings > 0).sort((a, b) => (b.warnings || 0) - (a.warnings || 0)).slice(0, 5);
+  document.getElementById('topWarnings').innerHTML = topW.length
+    ? topW.map((a, i) => `<div class="rank-item"><div class="rank-num">#${i+1}</div><div class="rank-name">${escapeHtml(a.nick)}<div class="rank-pos">${escapeHtml(a.position)}</div></div><div class="rank-value minus">${a.warnings} ⚠</div></div>`).join('')
+    : '<div style="color:#66bb6a;padding:10px;text-align:center;">Ни у кого нет выговоров 🎉</div>';
+
+  const positionsCount = {};
+  admins.forEach(a => { positionsCount[a.position] = (positionsCount[a.position] || 0) + 1; });
+  const maxCount = Math.max(1, ...Object.values(positionsCount));
+  const positionsFiltered = HIERARCHY.filter(p => positionsCount[p] > 0);
+  document.getElementById('hierarchyStats').innerHTML = positionsFiltered.length
+    ? positionsFiltered.map(p => {
+        const count = positionsCount[p];
+        const width = (count / maxCount) * 100;
+        return `<div class="hierarchy-row"><span class="h-pos">${escapeHtml(p)}</span><span class="h-count">${count}</span><div class="h-bar"><div class="h-bar-inner" style="width:${width}%"></div></div></div>`;
+      }).join('')
+    : '<div style="color:#667;padding:10px;text-align:center;">Пусто</div>';
+}
+
+/* ============================================================
+   РЕНДЕР АДМИНОВ
+   ============================================================ */
+function renderAdmins() {
+  const container = document.getElementById('cards-admins');
+  const empty = document.getElementById('empty-admins');
+  const noResults = document.getElementById('noResultsAdmins');
+  const query = (document.getElementById('searchAdmins').value || '').trim().toLowerCase();
+  const sorted = sortByHierarchy(admins);
+  const filtered = query === '' ? sorted : sorted.filter(a => a.nick.toLowerCase().includes(query) || a.position.toLowerCase().includes(query));
+
+  if (admins.length === 0) { container.innerHTML = ''; empty.style.display = 'block'; noResults.style.display = 'none'; return; }
+  empty.style.display = 'none';
+  if (filtered.length === 0) { container.innerHTML = ''; noResults.style.display = 'block'; return; }
+  noResults.style.display = 'none';
+
+  container.innerHTML = filtered.map(a => {
+    const isWarned = a.warnings >= 3;
+    const me = isMe(a);
+    const isBanned = a.link && findBanByVk(a.link);
+    const prefixesHTML = renderPrefixesHTML(getAllPrefixes(a));
+    const achievementsHTML = renderAchievementsHTML(a);
+    const notesHTML = a.notes ? `<div class="notes-block"><strong>📝 Примечание</strong>${escapeHtml(a.notes)}</div>` : '';
+    const canCounters = canManage(a);
+    const countersReason = canManageMessage(a);
+    const canEdit = canEditTarget(a);
+
+    let cardClass = '';
+    if (isWarned) cardClass += ' warned';
+    if (me) cardClass += ' my-card';
+
+    return `
+      <div class="card${cardClass}">
+        <div class="nick">
+          ${escapeHtml(a.nick)}
+          ${a.link ? `<a href="${escapeAttr(a.link)}" target="_blank" rel="noopener">🔗</a>` : ''}
+          ${me ? '<span class="me-tag">Это вы</span>' : ''}
+          ${isBanned ? '<span class="banned-tag">⛔ В ЧС</span>' : ''}
+        </div>
+        ${prefixesHTML}
+        ${achievementsHTML}
+        <div class="info-row"><span>Должность</span><span>${escapeHtml(a.position)}</span></div>
+        <div class="info-row"><span>На посту с</span><span>${formatDate(a.date)}</span></div>
+        <div class="info-row">
+          <span>Выговоры</span>
+          <span class="counter-controls">
+            <button class="counter-btn" onclick="quickDecrease('${a.id}','warnings')" ${a.warnings <= 0 || !canCounters ? 'disabled' : ''} title="${countersReason || 'Снять 1'}">−</button>
+            <span class="counter-val" style="${isWarned ? 'color:#ff6b81' : ''}">${a.warnings}/3</span>
+            <button class="counter-btn plus" onclick="openCounter('${a.id}','warnings')" ${a.warnings >= 3 || !canCounters ? 'disabled' : ''} title="${countersReason || 'Выдать'}">+</button>
+          </span>
+        </div>
+        <div class="info-row">
+          <span>Баллы</span>
+          <span class="counter-controls">
+            <button class="counter-btn" onclick="quickDecrease('${a.id}','points')" ${a.points <= 0 || !canCounters ? 'disabled' : ''} title="${countersReason || 'Снять 1'}">−</button>
+            <span class="counter-val">${a.points}</span>
+            <button class="counter-btn plus" onclick="openCounter('${a.id}','points')" ${!canCounters ? 'disabled' : ''} title="${countersReason || 'Изменить'}">+</button>
+          </span>
+        </div>
+        ${notesHTML}
+        <div class="card-actions">
+          ${canEdit ? `
+            <button class="edit-btn" onclick="editAdmin('${a.id}')">✏ Изменить</button>
+            <button class="notes-btn" onclick="openPrefix('${a.id}')">🏷 Префиксы</button>
+            <button class="notes-btn" onclick="openNotes('${a.id}')">📝 Заметка</button>
+            <button class="remove-btn" onclick="removeAdmin('${a.id}')">⬇ Снять</button>
+          ` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+/* ============================================================
+   РЕНДЕР АРХИВА
+   ============================================================ */
+function renderArchive() {
+  const container = document.getElementById('cards-archive');
+  const empty = document.getElementById('empty-archive');
+  const noResults = document.getElementById('noResultsArchive');
+  const query = (document.getElementById('searchArchive').value || '').trim().toLowerCase();
+  const sorted = sortByHierarchy(archive);
+  const filtered = query === '' ? sorted : sorted.filter(a =>
+    a.nick.toLowerCase().includes(query) || (a.position || '').toLowerCase().includes(query) || (a.reason || '').toLowerCase().includes(query));
+
+  if (archive.length === 0) { container.innerHTML = ''; empty.style.display = 'block'; noResults.style.display = 'none'; return; }
+  empty.style.display = 'none';
+  if (filtered.length === 0) { container.innerHTML = ''; noResults.style.display = 'block'; return; }
+  noResults.style.display = 'none';
+
+  container.innerHTML = filtered.map(a => {
+    const prefixesHTML = renderPrefixesHTML(getAllPrefixes(a));
+    return `
+      <div class="card archived">
+        <div class="nick">${escapeHtml(a.nick)}${a.link ? `<a href="${escapeAttr(a.link)}" target="_blank" rel="noopener">🔗</a>` : ''}</div>
+        ${prefixesHTML}
+        <div class="info-row"><span>Был(а) на должности</span><span>${escapeHtml(a.position || '—')}</span></div>
+        <div class="info-row"><span>На посту с</span><span>${formatDate(a.date)}</span></div>
+        <div class="info-row"><span>Снят</span><span>${formatDateTime(a.removed_at)}</span></div>
+        <div class="info-row"><span>Причина</span><span style="color:#ffb3c1;">${escapeHtml(a.reason || '—')}</span></div>
+        <div class="card-actions">
+          ${currentUser && currentUser.isOwner ? `<button class="restore-btn" onclick="restoreFromArchive('${a.id}')">↺ Восстановить</button>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+/* ============================================================
+   РЕНДЕР ЧС
+   ============================================================ */
+function renderBans() {
+  const container = document.getElementById('cards-bans');
+  const empty = document.getElementById('empty-bans');
+  const noResults = document.getElementById('noResultsBans');
+  const query = (document.getElementById('searchBans').value || '').trim().toLowerCase();
+  const filtered = query === '' ? bans : bans.filter(b => b.nick.toLowerCase().includes(query) || b.reason.toLowerCase().includes(query));
+
+  if (bans.length === 0) { container.innerHTML = ''; empty.style.display = 'block'; noResults.style.display = 'none'; return; }
+  empty.style.display = 'none';
+  if (filtered.length === 0) { container.innerHTML = ''; noResults.style.display = 'block'; return; }
+  noResults.style.display = 'none';
+
+  container.innerHTML = filtered.map(b => {
+    const period = b.forever
+      ? `<span class="badge-label forever">НАВСЕГДА</span>`
+      : `<span class="badge-label temp">${formatDate(b.from_date) || '—'} → ${formatDate(b.to_date) || '—'}</span>`;
+    return `
+      <div class="card banned">
+        <div class="nick">${escapeHtml(b.nick)}${b.vk ? `<a href="${escapeAttr(b.vk)}" target="_blank" rel="noopener" title="ВК">ВК</a>` : ''}</div>
+        <div class="info-row"><span>Срок</span><span>${period}</span></div>
+        <div class="info-row"><span>Причина</span><span style="color:#ffb3c1;">${escapeHtml(b.reason)}</span></div>
+        <div class="info-row"><span>Добавлен</span><span>${formatDateTime(b.added_at)}</span></div>
+        <div class="card-actions">
+          ${currentUser && currentUser.isOwner ? `<button class="restore-btn" onclick="unbanUser('${b.id}')">✓ Снять с ЧС</button>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+/* ============================================================
+   РЕНДЕР ЛОГОВ
+   ============================================================ */
+function renderLogs() {
+  const container = document.getElementById('log-list');
+  const empty = document.getElementById('empty-logs');
+  const noResults = document.getElementById('noResultsLogs');
+  const query = (document.getElementById('searchLogs').value || '').trim().toLowerCase();
+  const filtered = query === '' ? logs : logs.filter(l => l.html.toLowerCase().includes(query));
+
+  if (logs.length === 0) { container.innerHTML = ''; empty.style.display = 'block'; noResults.style.display = 'none'; return; }
+  empty.style.display = 'none';
+  if (filtered.length === 0) { container.innerHTML = ''; noResults.style.display = 'block'; return; }
+  noResults.style.display = 'none';
+
+  const typeLabels = {
+    points: 'Баллы', warnings: 'Выговоры', removed: 'Снятие',
+    ban: 'ЧС', unban: 'Снятие с ЧС', created: 'Добавление',
+    restored: 'Восстановление', account: 'Аккаунты', blocked: 'Заблокировано'
+  };
+
+  container.innerHTML = filtered.map(l => `
+    <div class="log-entry ${l.type}">
+      <div class="log-head">
+        <span class="log-type">${typeLabels[l.type] || l.type}</span>
+        <span class="log-time">${formatDateTime(l.at)}</span>
+      </div>
+      <div class="log-text">${l.html}</div>
+    </div>
+  `).join('');
+}
+
+/* ============================================================
+   РЕНДЕР УВЕДОМЛЕНИЙ
+   ============================================================ */
+function renderNotifications() {
+  const listEl = document.getElementById('notifList');
+  const emptyEl = document.getElementById('empty-notifications');
+  const countEl = document.getElementById('notifCount');
+  if (!listEl) return;
+
+  if (!currentUser) {
+    listEl.innerHTML = '';
+    emptyEl.style.display = 'block';
+    emptyEl.textContent = 'Войдите, чтобы увидеть уведомления.';
+    countEl.textContent = '';
+    return;
+  }
+
+  const myNotifs = getMyNotifications();
+
+  if (myNotifs.length === 0) {
+    listEl.innerHTML = '';
+    emptyEl.style.display = 'block';
+    emptyEl.textContent = 'Уведомлений пока нет.';
+    countEl.textContent = '';
+    return;
+  }
+  emptyEl.style.display = 'none';
+
+  const typeIcons = {
+    points: '💠', warnings: '⚠', removed: '⬇', ban: '🚫', unban: '✅',
+    created: '➕', restored: '↺', account: '👤',
+    role: '🎖', prefix: '🏷'
+  };
+
+  const unreadCount = myNotifs.filter(n => !n.read).length;
+  countEl.textContent = unreadCount > 0 ? `(${unreadCount} новых)` : '';
+
+  listEl.innerHTML = myNotifs.map(n => `
+    <div class="notif-item ${n.type} ${n.read ? '' : 'unread'}" onclick="markNotificationRead('${n.id}')">
+      <div class="notif-icon">${typeIcons[n.type] || '🔔'}</div>
+      <div class="notif-body">
+        <div class="notif-text">
+          ${n.html}
+          ${n.read ? '' : '<span class="notif-badge new">Новое</span>'}
+        </div>
+        <div class="notif-time">${formatTimeAgo(n.at)}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+/* ============================================================
+   РЕНДЕР ПРИГЛАШЕНИЙ
+   ============================================================ */
+function renderAccounts() {
+  const container = document.getElementById('cards-accounts');
+  const empty = document.getElementById('empty-accounts');
+  const noResults = document.getElementById('noResultsAccounts');
+  if (!container) return;
+  const query = (document.getElementById('searchAccounts').value || '').trim().toLowerCase();
+  const filtered = query === '' ? invites : invites.filter(a => a.nick.toLowerCase().includes(query) || a.position.toLowerCase().includes(query));
+
+  if (invites.length === 0) { container.innerHTML = ''; empty.style.display = 'block'; noResults.style.display = 'none'; return; }
+  empty.style.display = 'none';
+  if (filtered.length === 0) { container.innerHTML = ''; noResults.style.display = 'block'; return; }
+  noResults.style.display = 'none';
+
+  container.innerHTML = filtered.map(a => {
+    const statusBadge = a.used ? `<span class="badge-label used">ИСПОЛЬЗОВАН</span>` : `<span class="badge-label active">АКТИВЕН</span>`;
+    const adminMatch = admins.some(x => x && x.nick && x.nick.toLowerCase() === (a.nick || '').toLowerCase());
+    const matchBadge = adminMatch ? `<span class="badge-label matched">✓ Совпадает с админом</span>` : `<span class="badge-label unmatched">⚠ Нет админа</span>`;
+    return `
+      <div class="card ${a.used ? 'used-card' : 'invite-card'}">
+        <div class="nick">${escapeHtml(a.nick)}</div>
+        <div class="info-row"><span>Статус</span><span>${statusBadge}</span></div>
+        <div class="info-row"><span>Сверка с админами</span><span>${matchBadge}</span></div>
+        <div class="info-row"><span>Должность</span><span>${escapeHtml(a.position)}</span></div>
+        <div class="info-row"><span>Ключ</span><span class="key-display">${escapeHtml(a.key)}<button class="copy-btn" onclick="copyKey('${escapeAttr(a.key)}')">📋</button></span></div>
+        <div class="info-row"><span>Создан</span><span>${formatDateTime(a.created_at)}</span></div>
+        ${a.used ? `<div class="info-row"><span>Активирован</span><span>${formatDateTime(a.used_at)}</span></div>` : ''}
+        <div class="card-actions"><button class="remove-btn" onclick="deleteInvite('${a.id}')">🗑 Удалить</button></div>
+      </div>
+    `;
+  }).join('');
+}
+
+/* ============================================================
+   РЕНДЕР АККАУНТОВ
+   ============================================================ */
+function renderUsers() {
+  const container = document.getElementById('cards-users');
+  const empty = document.getElementById('empty-users');
+  const noResults = document.getElementById('noResultsUsers');
+  if (!container) return;
+  const registered = invites.filter(i => i.used);
+  const query = (document.getElementById('searchUsers').value || '').trim().toLowerCase();
+  const filtered = query === '' ? registered : registered.filter(a => a.nick.toLowerCase().includes(query) || a.position.toLowerCase().includes(query));
+
+  if (registered.length === 0) { container.innerHTML = ''; empty.style.display = 'block'; noResults.style.display = 'none'; return; }
+  empty.style.display = 'none';
+  if (filtered.length === 0) { container.innerHTML = ''; noResults.style.display = 'block'; return; }
+  noResults.style.display = 'none';
+
+  const sorted = sortByHierarchy(filtered);
+  container.innerHTML = sorted.map(a => {
+    const isOwnerAcc = isOwnerRole(a.position);
+    const isSelf = currentUser && currentUser.nick.toLowerCase() === a.nick.toLowerCase();
+    const canManageThis = currentUser && currentUser.isOwner && !isSelf;
+    const roleBadge = isOwnerAcc ? `<span class="badge-label owner">👑 ВЛАДЕЛЕЦ</span>` : `<span class="badge-label admin">АДМИН</span>`;
+    const selfLabel = isSelf ? ' <span style="color:#ffb300;font-size:12px;">(вы)</span>' : '';
+    return `
+      <div class="card account-card ${isOwnerAcc ? 'owner-account' : ''}">
+        <div class="nick">${escapeHtml(a.nick)}${selfLabel}</div>
+        <div class="info-row"><span>Статус</span><span>${roleBadge}</span></div>
+        <div class="info-row"><span>Должность</span><span>${escapeHtml(a.position)}</span></div>
+        <div class="info-row"><span>Пароль</span><span style="font-family:monospace;color:#ffb300;">${escapeHtml(a.password || '—')}</span></div>
+        <div class="info-row"><span>Ключ</span><span style="font-family:monospace;font-size:12px;color:#9fb3c8;">${escapeHtml(a.key || '—')}</span></div>
+        <div class="info-row"><span>Создан</span><span>${formatDateTime(a.created_at)}</span></div>
+        <div class="info-row"><span>Активирован</span><span>${formatDateTime(a.used_at)}</span></div>
+        <div class="card-actions">
+          ${canManageThis ? `
+            <button class="role-btn" onclick="editUserRole('${a.id}')">✏ Изменить роль</button>
+            <button class="remove-btn" onclick="deleteUser('${a.id}')">🗑 Удалить</button>
+          ` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+/* ============================================================
+   ЗАКРЫТИЕ МОДАЛОК
+   ============================================================ */
+const modalClosers = {
+  loginModal: closeLogin, registerModal: closeRegister, registerStep2Modal: closeRegister,
+  counterModal: closeCounter, confirmModal: closeConfirm, editModal: closeEdit,
+  notesModal: closeNotes, prefixModal: closePrefix, unbanModal: closeUnban,
+  deleteAccModal: closeDeleteAcc, editUserRoleModal: closeEditUserRole,
+  deleteUserModal: closeDeleteUser,
+};
+Object.keys(modalClosers).forEach(id => {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.addEventListener('click', (e) => { if (e.target.id === id) modalClosers[id](); });
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') Object.values(modalClosers).forEach(fn => { try { fn(); } catch(_) {} });
+});
+
+/* ============================================================
+   АВТООБНОВЛЕНИЕ
+   ============================================================ */
+setInterval(() => { if (!document.hidden && !isSaving) loadFromCloud(true); }, 30000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden && !isSaving) loadFromCloud(true); });
+
+/* ============================================================
+   СТАРТ
+   ============================================================ */
+try {
+  const saved = sessionStorage.getItem('currentUser');
+  if (saved) {
+    const parsed = JSON.parse(saved);
+    if (parsed && parsed.nick && parsed.position) currentUser = parsed;
+  }
+} catch (e) { currentUser = null; }
+
+updateAuthUI();
+loadFromCloud();
+</script>
+</body>
+</html>
